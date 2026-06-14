@@ -180,6 +180,13 @@ def test_tts_worker_start_clears_previous_cancel_state(monkeypatch) -> None:
 
 def test_tts_worker_drops_dispatch_output_after_cancel() -> None:
     audio_path_queue = CountingQueue()
+
+
+def test_ui_worker_skip_speech_stops_audio_regardless_of_queue() -> None:
+    """skip_speech now always stops the active audio channel, even when the
+    queue is empty — this is required so preset-voice playback can be
+    interrupted alongside synthesised TTS."""
+    audio_path_queue = Queue()
     _make_app_runtime(audio_path_queue=audio_path_queue)
     worker = TTSWorker(CountingQueue(), audio_path_queue)
     started = threading.Event()
@@ -234,9 +241,12 @@ def test_ui_worker_skip_speech_is_noop_when_no_dialog_or_audio_is_active() -> No
 
     worker.skip_speech()
 
-    worker.dialog_channel.stop.assert_not_called()
-    runtime.ui_update_manager.post_tts_skip.assert_not_called()
-    assert worker.task_done_requested.set_calls == 0
+    # Audio channel must be stopped (it's busy — mock returns truthy)
+    worker.dialog_channel.stop.assert_called_once()
+    # current_audio_path must be cleared
+    assert worker.current_audio_path is None
+    # task_done_requested must be set so any waiting dispatch aborts
+    assert worker.task_done_requested.set_calls > 0
 
 
 def test_ui_worker_skip_speech_stops_active_audio_and_emits_tts_skip() -> None:

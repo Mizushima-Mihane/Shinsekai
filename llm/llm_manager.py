@@ -333,9 +333,22 @@ class LLMManager:
         self._chat_depth = 0
         self._turn_state: Optional[_ChatTurnState] = None
         self._history_file = history_file
-        
+        self._cancel_requested = False
         # 设置日志
         self.logger = logger
+
+    def cancel_current_chat(self) -> None:
+        """Request cancellation of the current :meth:`chat` call.
+
+        Sets the internal flag so stream loops exit early, and calls the
+        adapter's ``cancel()`` to close the underlying HTTP connection.
+        """
+        self._cancel_requested = True
+        if self.llm_adapter is not None:
+            try:
+                self.llm_adapter.cancel()
+            except Exception:
+                pass
 
     def _confirm_risky_tool(self, tool_name: str, risk: str, args_str: str) -> bool:
         """Request user confirmation for a risky tool. Returns True if confirmed."""
@@ -790,6 +803,7 @@ class LLMManager:
         if outer_chat:
             self._begin_chat_turn(first_user_turn=first_user_turn)
         self._chat_depth += 1
+        self._cancel_requested = False
         # 清理孤立的 tool_calls（必须在加 user 消息之前，否则占位 tool 回执会插在 user 后面）
         self._strip_orphaned_tool_calls()
 
@@ -1006,6 +1020,8 @@ class LLMManager:
             if isinstance(self.llm_adapter, ClaudeAdapter):
                 with response_stream as stream:
                     for event in stream:
+                        if self._cancel_requested:
+                            break
                         if event.type == "content_block_delta" and event.delta.type == "text_delta":
                             yield event.delta.text
                             collected_content += event.delta.text
@@ -1016,6 +1032,8 @@ class LLMManager:
                             full_tool_calls[event.index]["input"] += event.delta.partial_json
             else:
                 for chunk in response_stream:
+                    if self._cancel_requested:
+                        break
                     if not chunk or not chunk.choices: continue
                     delta = chunk.choices[0].delta
                     if hasattr(delta, 'tool_calls') and delta.tool_calls:
@@ -1035,6 +1053,8 @@ class LLMManager:
                         yield delta.content
                         collected_content += delta.content
         except Exception as exc:
+            if self._cancel_requested:
+                return
             stream_failed = True
             self._log_llm_request_failed(
                 round_index=round_index,
@@ -1054,6 +1074,9 @@ class LLMManager:
                     reasoning_chars=len(collected_reasoning),
                     tool_call_count=len(full_tool_calls),
                 )
+
+        if self._cancel_requested:
+            return
 
         if has_tool_use:
             formatted_calls = []
@@ -1083,6 +1106,8 @@ class LLMManager:
                     func_name = call['function']['name']
                 self.add_message("tool", result, tool_call_id=call['id'], name=func_name)
 
+            if self._cancel_requested:
+                return
             yield from self._chat_with_tools_stream(**kwargs)
         else:
             self._persist_plain_assistant_turn(collected_content, collected_reasoning)
@@ -1128,6 +1153,9 @@ class LLMManager:
                 started=request_started,
                 outcome="no_response",
             )
+            return ""
+
+        if self._cancel_requested:
             return ""
 
         content = ""
@@ -1182,6 +1210,8 @@ class LLMManager:
                     func_name = call['function']['name']
                 self.add_message("tool", result, tool_call_id=call['id'], name=func_name)
 
+            if self._cancel_requested:
+                return ""
             return self._chat_with_tools_sync(**kwargs)
         else:
             self._persist_plain_assistant_turn(content, reasoning)
