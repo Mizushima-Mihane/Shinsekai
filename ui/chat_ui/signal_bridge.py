@@ -247,6 +247,7 @@ def attach_chat_ui_window(window: object) -> None:
     _connect_window_signal(window, b, "close_window", _relay0)
     _connect_window_signal(window, b, "clear_chat_history", _relay0)
     _connect_window_signal(window, b, "skip_speech_signal", _relay0)
+    _connect_window_signal(window, b, "interrupt_requested", _relay0)
     _connect_window_signal(window, b, "flush_batch", _relay0)
     _connect_window_signal(window, b, "llm_reply_finished", _relay0)
     _connect_window_signal(window, b, "pause_asr_signal", _relay0)

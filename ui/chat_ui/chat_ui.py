@@ -6,7 +6,7 @@ import numpy as np
 import threading
 import yaml
 import time
-from PySide6.QtCore import QByteArray, QEvent, QPoint, QRect, Qt, Signal, QSize, QUrl
+from PySide6.QtCore import QByteArray, QEvent, QPoint, QRect, Qt, QTimer, Signal, QSize, QUrl
 from PySide6.QtGui import (
     QCursor,
     QFont,
@@ -82,6 +82,7 @@ class ChatUIWindow(DesktopToolbarMixin, DesktopMenuMixin, QWidget):
     user_input_started = Signal()
     user_input_ended = Signal()
     flush_batch = Signal()  # Ctrl+Enter — commit accumulated batch immediately
+    interrupt_requested = Signal()  # 手动打断按钮
 
     def __init__(self, image_queue, emotion_queue, llm_manager, sprite_mode=False, background_mode = False, max_sprite_slots=3):
         """初始化窗口"""
@@ -511,7 +512,7 @@ class ChatUIWindow(DesktopToolbarMixin, DesktopMenuMixin, QWidget):
         self.skip_button.setParent(self.image_container)
         self.skip_button.setFixedSize(48, 48)
         self.skip_button.setStyleSheet(styles.skip_speech_button())
-        # 4. 连接按钮到跳过信号
+        self.skip_button.clicked.connect(lambda: self.skip_speech_signal.emit())
         self.skip_button.hide()
 
         # 重试按钮 — 对话框外右上方
@@ -610,8 +611,15 @@ class ChatUIWindow(DesktopToolbarMixin, DesktopMenuMixin, QWidget):
         self.pause_asr_signal.connect(self.mic_button.pause_asr)
         self.mic_button.send_final_transcription.connect(self.sendMessage)
 
+        # 打断按钮 — 点击停止 LLM/TTS，常驻在 mic 与 send 之间
+        self.interrupt_btn = QPushButton("■")
+        self.interrupt_btn.setFixedSize(48, 48)
+        self.interrupt_btn.setStyleSheet(styles.interrupt_button(str(self._send_btn_font_px())))
+        self.interrupt_btn.clicked.connect(self._on_interrupt_clicked)
+
         input_layout.addWidget(self.input_box)
         input_layout.addWidget(self.mic_button)
+        input_layout.addWidget(self.interrupt_btn)
         input_layout.addWidget(self.send_btn)
 
     def _layout_input_row(self) -> None:
@@ -1211,6 +1219,12 @@ class ChatUIWindow(DesktopToolbarMixin, DesktopMenuMixin, QWidget):
             # before textChanged triggers schedule_flush
             self.message_submitted.emit(message)
             self.input_box.clear()
+
+    def _on_interrupt_clicked(self) -> None:
+        """用户点击打断按钮：停止 LLM/TTS 并恢复输入框。"""
+        self.interrupt_requested.emit()
+        self.input_box.setPlaceholderText(tr("desktop.input_placeholder"))
+        self.input_box.setFocus()
 
     def _on_reroll(self):
         msg = getattr(self, "_last_user_message", "")

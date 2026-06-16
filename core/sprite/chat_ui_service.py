@@ -129,6 +129,14 @@ def wire_chat_ui_bridge(
     if ui_worker is not None and hasattr(ui_worker, "skip_speech"):
         ctx.on_skip_speech_signal(lambda: ui_worker.skip_speech())
 
+    # 手动打断按钮 → 停止 LLM/TTS 并恢复输入
+    def on_interrupt_requested() -> None:
+        from core.runtime.app_runtime import request_interrupt
+        request_interrupt()
+        ctx.set_notification_hint("已打断")
+
+    ctx.on_interrupt_requested(on_interrupt_requested)
+
     # Ctrl+Enter → flush accumulated batch immediately
     from core.plugins.plugin_host import get_active_batcher
     _batcher = get_active_batcher()

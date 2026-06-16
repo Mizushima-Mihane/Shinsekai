@@ -248,6 +248,26 @@ def skip_speech_button(font_size: str = "16px") -> str:
         """
 
 
+def interrupt_button(font_size: str = "18px") -> str:
+    """打断按钮 — 暗色半透明底，白色前景，与输入栏其他按钮同风格。"""
+    return f"""
+            QPushButton {{
+                background-color: rgba(40, 40, 40, 180);
+                color: white;
+                border: none;
+                border-radius: 10px;
+                padding: 10px;
+                font-size: {font_size};
+            }}
+            QPushButton:hover {{
+                background-color: rgba(70, 70, 70, 220);
+            }}
+            QPushButton:pressed {{
+                background-color: rgba(90, 90, 90, 240);
+            }}
+        """
+
+
 def options_widget_container(chrome_extra: str = "") -> str:
     cx = _chrome_x(chrome_extra)
     return f"""
