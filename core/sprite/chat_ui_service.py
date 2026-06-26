@@ -74,8 +74,8 @@ def wire_chat_ui_bridge(
             return
 
         # --- Interrupt active generation / playback ---
-        from core.runtime.app_runtime import is_anything_running, request_interrupt
-        if is_anything_running():
+        from core.runtime.app_runtime import is_anything_running, request_interrupt, _interrupt_enabled
+        if is_anything_running() and _interrupt_enabled():
             request_interrupt()
             ctx.set_notification_hint("已打断，正在处理新消息…")
 
@@ -131,9 +131,10 @@ def wire_chat_ui_bridge(
 
     # 手动打断按钮 → 停止 LLM/TTS 并恢复输入
     def on_interrupt_requested() -> None:
-        from core.runtime.app_runtime import request_interrupt
-        request_interrupt()
-        ctx.set_notification_hint("已打断")
+        from core.runtime.app_runtime import request_interrupt, _interrupt_enabled
+        if _interrupt_enabled():
+            request_interrupt()
+            ctx.set_notification_hint("已打断")
 
     ctx.on_interrupt_requested(on_interrupt_requested)
 

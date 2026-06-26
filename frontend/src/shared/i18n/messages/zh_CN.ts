@@ -885,6 +885,7 @@ export const zhCNMessages: Record<MessageKey, string> = {
   "template.field.useChoice": "选择规则",
   "template.field.useCot": "思维链提示",
   "template.field.useEffect": "演出效果",
+  "template.field.useInterrupt": "启用打断",
   "template.field.useNarration": "旁白规则",
   "template.field.useStat": "数值状态规则",
   "template.field.useTranslation": "LLM 翻译",

@@ -250,6 +250,7 @@ def _generate_template_summary(state: BridgeState, payload: dict[str, Any]) -> d
         bool(payload.get("useChoice", True)),
         bool(payload.get("useNarration", True)),
         bool(payload.get("useStat", True)),
+        bool(payload.get("useInterrupt", True)),
         max_speech_chars=max_speech_chars,
         max_dialog_items=max_dialog_items,
     )
@@ -296,6 +297,7 @@ def _template_session_to_frontend(raw: dict[str, Any] | None) -> dict[str, Any] 
         "useChoice": bool(raw.get("use_choice_yes", True)),
         "useCot": bool(raw.get("use_cot_yes", False)),
         "useEffect": bool(raw.get("use_effect_yes", True)),
+        "useInterrupt": bool(raw.get("use_interrupt_yes", True)),
         "useNarration": bool(raw.get("use_narration_yes", True)),
         "useStat": bool(raw.get("use_stat_yes", True)),
         "useTranslation": bool(raw.get("use_tr_yes", True)),
@@ -325,6 +327,7 @@ def _save_template_session_payload(state: BridgeState, payload: dict[str, Any]) 
         "use_choice_yes": bool(payload.get("useChoice", True)),
         "use_narration_yes": bool(payload.get("useNarration", True)),
         "use_stat_yes": bool(payload.get("useStat", True)),
+        "use_interrupt_yes": bool(payload.get("useInterrupt", True)),
         "max_speech_chars": _safe_session_int(payload.get("maxSpeechChars")),
         "max_dialog_items": _safe_session_int(payload.get("maxDialogItems")),
         "scenario_text": str(payload.get("scenario") or ""),

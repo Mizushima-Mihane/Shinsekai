@@ -253,6 +253,9 @@ def main():
     logger.info("Chat application starting", extra={"event": "app.started"})
     with _startup_phase("config.load"):
         config = ConfigManager()
+    # Allow the launcher to disable interrupt by env var
+    if os.environ.get("SHINSEKAI_INTERRUPT_DISABLED") == "1":
+        config.config.api_config.interrupt_enabled = False
     with _startup_phase("i18n.import"):
         from i18n import init_i18n, tr as tr_i18n, tr_in_bundle
         from asr.asr_adapter import system_config_to_asr_lang

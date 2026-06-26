@@ -81,6 +81,7 @@ def test_template_session_to_frontend_normalizes_types_and_defaults():
         "useChoice": False,
         "useCot": True,
         "useEffect": False,
+        "useInterrupt": True,
         "useNarration": False,
         "useStat": False,
         "useTranslation": False,

@@ -839,6 +839,7 @@ export type MessageKey =
   | "template.field.useChoice"
   | "template.field.useCot"
   | "template.field.useEffect"
+  | "template.field.useInterrupt"
   | "template.field.useNarration"
   | "template.field.useStat"
   | "template.field.useTranslation"

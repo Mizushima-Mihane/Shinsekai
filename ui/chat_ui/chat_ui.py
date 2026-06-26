@@ -6,14 +6,18 @@ import numpy as np
 import threading
 import yaml
 import time
-from PySide6.QtCore import QByteArray, QEvent, QPoint, QRect, Qt, QTimer, Signal, QSize, QUrl
+from PySide6.QtCore import QByteArray, QEvent, QPoint, QRect, QRectF, Qt, QTimer, Signal, QSize, QUrl
 from PySide6.QtGui import (
+    QColor,
     QCursor,
     QFont,
     QGuiApplication,
     QHoverEvent,
+    QIcon,
     QImage,
     QMouseEvent,
+    QPainter,
+    QPainterPath,
     QPixmap,
     QFontMetrics,
     QShowEvent,
@@ -57,6 +61,75 @@ config_manager = ConfigManager()
 _logger = logging.getLogger(__name__)
 
 DIALOG_FRAME_PATH = resource_path("assets/system/picture/dialog_frame.png").as_posix()
+
+
+class _InterruptButton(QPushButton):
+    """打断按钮 — 用 QPixmap 图标确保方块填充度。"""
+
+    _SIZE = 48
+    _SQUARE_MARGIN = 0.28  # 方块边距比例
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(self._SIZE, self._SIZE)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet(
+            "QPushButton { background: transparent; border: none; }"
+            "QPushButton:hover { background: transparent; }"
+            "QPushButton:pressed { background: transparent; }"
+        )
+        self._hovered = False
+        self._pressed = False
+        self._rebuild_icons()
+
+    def _draw_icon(self, bg: QColor, fg: QColor) -> QIcon:
+        px = QPixmap(self._SIZE, self._SIZE)
+        px.fill(Qt.GlobalColor.transparent)
+        p = QPainter(px)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # 圆角背景
+        bg_path = QPainterPath()
+        bg_path.addRoundedRect(QRectF(0, 0, self._SIZE, self._SIZE), 10, 10)
+        p.fillPath(bg_path, bg)
+        # 白色方块
+        m = int(self._SIZE * self._SQUARE_MARGIN)
+        sq = QRectF(float(m), float(m), self._SIZE - 2 * m, self._SIZE - 2 * m)
+        p.fillRect(sq, fg)
+        p.end()
+        return QIcon(px)
+
+    def _rebuild_icons(self):
+        self._icon_normal = self._draw_icon(
+            QColor(40, 40, 40, 180), QColor(255, 255, 255)
+        )
+        self._icon_hover = self._draw_icon(
+            QColor(200, 50, 50, 180), QColor(255, 255, 255)
+        )
+        self._icon_pressed = self._draw_icon(
+            QColor(220, 80, 80, 220), QColor(255, 255, 255)
+        )
+        self.setIcon(self._icon_normal)
+        self.setIconSize(QSize(self._SIZE, self._SIZE))
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.setIcon(self._icon_hover)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.setIcon(self._icon_normal)
+
+    def mousePressEvent(self, event):
+        self._pressed = True
+        self.setIcon(self._icon_pressed)
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._pressed = False
+        self.setIcon(self._icon_hover if self._hovered else self._icon_normal)
+        super().mouseReleaseEvent(event)
+
+
 class ChatUIWindow(DesktopToolbarMixin, DesktopMenuMixin, QWidget):
     """桌面助手主窗口"""
     message_submitted = Signal(str)  # 定义信号用于发送消息
@@ -611,11 +684,10 @@ class ChatUIWindow(DesktopToolbarMixin, DesktopMenuMixin, QWidget):
         self.pause_asr_signal.connect(self.mic_button.pause_asr)
         self.mic_button.send_final_transcription.connect(self.sendMessage)
 
-        # 打断按钮 — 点击停止 LLM/TTS，常驻在 mic 与 send 之间
-        self.interrupt_btn = QPushButton("■")
-        self.interrupt_btn.setFixedSize(48, 48)
-        self.interrupt_btn.setStyleSheet(styles.interrupt_button(str(self._send_btn_font_px())))
+        # 打断按钮 — 自绘方形 Stop 图标，常驻在 mic 与 send 之间
+        self.interrupt_btn = _InterruptButton()
         self.interrupt_btn.clicked.connect(self._on_interrupt_clicked)
+        self._sync_interrupt_btn_visibility()
 
         input_layout.addWidget(self.input_box)
         input_layout.addWidget(self.mic_button)
@@ -1146,8 +1218,20 @@ class ChatUIWindow(DesktopToolbarMixin, DesktopMenuMixin, QWidget):
                     if rt and rt.ui_update_manager:
                         rt.ui_update_manager.post_busy_bar(indicator, 0.0)
             elif self._ime_composing:
-                # IME composing with no committed text yet — treat as typing
+                # IME composing finished without committed text — clear the
+                # indicator that _update_batcher_for_typing posted and restart
+                # the countdown so the character can reply after the idle window.
+                self._ime_composing = False
                 self._stop_batch_timer()
+                try:
+                    from core.runtime.app_runtime import try_get_app_runtime
+                    rt = try_get_app_runtime()
+                    if rt and rt.ui_update_manager:
+                        rt.ui_update_manager.hide_busy_bar()
+                except Exception:
+                    pass
+                b.schedule_flush()
+                self._start_batch_timer()
             else:
                 b.schedule_flush()
                 self._start_batch_timer()
@@ -1219,6 +1303,16 @@ class ChatUIWindow(DesktopToolbarMixin, DesktopMenuMixin, QWidget):
             # before textChanged triggers schedule_flush
             self.message_submitted.emit(message)
             self.input_box.clear()
+
+    def _sync_interrupt_btn_visibility(self) -> None:
+        """根据当前 config 决定是否显示打断按钮。"""
+        enabled = True
+        try:
+            enabled = bool(config_manager.config.api_config.interrupt_enabled)
+        except Exception:
+            pass
+        if getattr(self, "interrupt_btn", None) is not None:
+            self.interrupt_btn.setVisible(enabled)
 
     def _on_interrupt_clicked(self) -> None:
         """用户点击打断按钮：停止 LLM/TTS 并恢复输入框。"""

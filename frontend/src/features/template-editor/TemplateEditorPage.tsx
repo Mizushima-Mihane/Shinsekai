@@ -87,6 +87,7 @@ export function TemplateEditorPage() {
   const [useCg, setUseCg] = useState(false);
   const [useCot, setUseCot] = useState(false);
   const [useChoice, setUseChoice] = useState(true);
+  const [useInterrupt, setUseInterrupt] = useState(true);
   const [useNarration, setUseNarration] = useState(true);
   const [useStat, setUseStat] = useState(true);
   const [maxSpeechChars, setMaxSpeechChars] = useState(0);
@@ -208,6 +209,7 @@ export function TemplateEditorPage() {
     setUseChoice(launchSession.useChoice ?? true);
     setUseNarration(launchSession.useNarration ?? true);
     setUseStat(launchSession.useStat ?? true);
+    setUseInterrupt(launchSession.useInterrupt ?? true);
     setMaxSpeechChars(Number(launchSession.maxSpeechChars) || 0);
     setMaxDialogItems(Number(launchSession.maxDialogItems) || 0);
     setInitSpritePath(launchSession.initSpritePath || "");
@@ -274,6 +276,7 @@ export function TemplateEditorPage() {
     useChoice,
     useCot,
     useEffect: useEffectPrompt,
+    useInterrupt,
     useNarration,
     useStat,
     useTranslation,
@@ -463,6 +466,7 @@ export function TemplateEditorPage() {
     selectedEffects,
     voiceLanguage,
     useEffectPrompt,
+    useInterrupt,
     useTranslation,
     useCg,
     useCot,
@@ -497,6 +501,7 @@ export function TemplateEditorPage() {
           selectedCharacters,
           template,
           useCg,
+          useInterrupt,
         }),
       );
       return { snapshot, template };
@@ -588,6 +593,7 @@ export function TemplateEditorPage() {
       value: useTranslation,
     },
     { key: "cg", label: t("template.field.useCg"), setValue: setUseCg, value: useCg },
+    { key: "interrupt", label: t("template.field.useInterrupt"), setValue: setUseInterrupt, value: useInterrupt },
     { key: "cot", label: t("template.field.useCot"), setValue: setUseCot, value: useCot },
     { key: "choice", label: t("template.field.useChoice"), setValue: setUseChoice, value: useChoice },
     { key: "narration", label: t("template.field.useNarration"), setValue: setUseNarration, value: useNarration },

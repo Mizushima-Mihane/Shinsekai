@@ -331,6 +331,7 @@ def _launch_chat(
     selected_bg: str,
     system_template: str,
     use_cg: bool,
+    use_interrupt: bool = True,
     user_scenario: str,
     stream_endpoint: str = "",
     workflow_path: str = "",
@@ -387,6 +388,8 @@ def _launch_chat(
         env["EASYAI_PROJECT_ROOT"] = str(project_root)
         env["SHINSEKAI_APP_ROOT"] = str(app_root)
         env["SHINSEKAI_SUPPRESS_MAIN_ERROR_DIALOG"] = "1"
+        if not use_interrupt:
+            env["SHINSEKAI_INTERRUPT_DISABLED"] = "1"
 
         if getattr(sys, "frozen", False):
             candidates = _main_exe_candidates(state)

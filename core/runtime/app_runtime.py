@@ -103,6 +103,17 @@ def is_anything_running() -> bool:
     return False
 
 
+def _interrupt_enabled() -> bool:
+    """Check whether the interrupt feature is enabled in current config."""
+    rt = try_get_app_runtime()
+    if rt is None:
+        return False
+    try:
+        return bool(rt.config.config.api_config.interrupt_enabled)
+    except Exception:
+        return True  # default to enabled if config can't be read
+
+
 def request_interrupt() -> None:
     """Cancel the current LLM generation and flush all downstream queues.
 
@@ -113,7 +124,11 @@ def request_interrupt() -> None:
     4. Stops currently-playing TTS audio.
     5. Clears the UI queue (synthesized audio not yet displayed).
     6. Hides the busy bar and resets the generating flag.
+
+    When ``interrupt_enabled`` is False in config, this is a no-op.
     """
+    if not _interrupt_enabled():
+        return
     rt = get_app_runtime()
 
     # 1. Signal cancellation — LLMWorker stream loop will break on this

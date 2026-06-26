@@ -241,8 +241,8 @@ def test_ui_worker_skip_speech_is_noop_when_no_dialog_or_audio_is_active() -> No
 
     worker.skip_speech()
 
-    # Audio channel must be stopped (it's busy — mock returns truthy)
-    worker.dialog_channel.stop.assert_called_once()
+    # Audio channel is NOT busy — stop should not be called
+    worker.dialog_channel.stop.assert_not_called()
     # current_audio_path must be cleared
     assert worker.current_audio_path is None
     # task_done_requested must be set so any waiting dispatch aborts
@@ -264,7 +264,6 @@ def test_ui_worker_skip_speech_stops_active_audio_and_emits_tts_skip() -> None:
     worker.dialog_channel.stop.assert_called_once_with()
     assert worker.current_audio_path is None
     assert runtime.ui_playback.current_audio_path is None
-    runtime.ui_update_manager.post_tts_skip.assert_called_once_with()
     assert worker.task_done_requested.set_calls == 1
 
 

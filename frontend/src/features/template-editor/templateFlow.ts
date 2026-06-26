@@ -24,6 +24,7 @@ export interface TemplateFlowOptions {
   useChoice: boolean;
   useCot: boolean;
   useEffect: boolean;
+  useInterrupt: boolean;
   useNarration: boolean;
   useStat: boolean;
   useTranslation: boolean;
@@ -112,6 +113,7 @@ export function buildTemplateGenerateInput(input: {
     useChoice: input.options.useChoice,
     useCot: input.options.useCot,
     useEffect: input.options.useEffect,
+    useInterrupt: input.options.useInterrupt,
     useNarration: input.options.useNarration,
     useStat: input.options.useStat,
     useTranslation: input.options.useTranslation,
@@ -145,6 +147,7 @@ export function buildTemplateLaunchSession(input: {
     useChoice: input.options.useChoice,
     useCot: input.options.useCot,
     useEffect: input.options.useEffect,
+    useInterrupt: input.options.useInterrupt,
     useNarration: input.options.useNarration,
     useStat: input.options.useStat,
     useTranslation: input.options.useTranslation,
@@ -160,6 +163,7 @@ export function buildChatLaunchPayload(input: {
   selectedCharacters: string[];
   template: TemplateSummary;
   useCg: boolean;
+  useInterrupt: boolean;
 }): ChatLaunchPayload {
   return {
     backgroundName: input.backgroundName,
@@ -174,5 +178,6 @@ export function buildChatLaunchPayload(input: {
     templateId: input.template.id,
     templateName: input.template.name,
     useCg: input.useCg,
+    useInterrupt: input.useInterrupt,
   };
 }

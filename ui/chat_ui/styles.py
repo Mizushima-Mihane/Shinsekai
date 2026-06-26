@@ -256,14 +256,16 @@ def interrupt_button(font_size: str = "18px") -> str:
                 color: white;
                 border: none;
                 border-radius: 10px;
-                padding: 10px;
+                padding: 0px;
                 font-size: {font_size};
+                font-weight: bold;
+                line-height: 1;
             }}
             QPushButton:hover {{
-                background-color: rgba(70, 70, 70, 220);
+                background-color: rgba(200, 50, 50, 180);
             }}
             QPushButton:pressed {{
-                background-color: rgba(90, 90, 90, 240);
+                background-color: rgba(220, 80, 80, 220);
             }}
         """
 

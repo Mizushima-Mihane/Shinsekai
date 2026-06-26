@@ -261,6 +261,7 @@ class TemplateGenerator:
         use_choice=True,
         use_narration=True,
         use_stat=True,
+        use_interrupt=True,
         max_speech_chars: int = 0,
         max_dialog_items: int = 0,
     ):
