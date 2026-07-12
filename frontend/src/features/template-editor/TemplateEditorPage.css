@@ -343,6 +343,7 @@
 
 .template-toggle-row {
   display: flex;
+  position: relative;
   min-width: 0;
   min-height: 20px;
   align-items: center;
@@ -353,18 +354,49 @@
   user-select: none;
 }
 
-.template-toggle-row span {
+.template-toggle-row__label {
+  display: inline-flex;
   min-width: 0;
-  overflow: hidden;
+  align-items: center;
+  gap: 4px;
   color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 520;
+}
+
+.template-toggle-row__label-text {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.template-toggle-row:hover span {
+.template-toggle-row:hover .template-toggle-row__label {
   color: var(--color-text-primary);
+}
+
+/* The hint bubble lives inside the 320px scrolling options panel; the default
+   centered position (translateX(-50%)) overflows and gets clipped on the left.
+   Anchor it to the toggle row instead — spanning the panel width — and open it
+   downward so the full text always fits regardless of label length. */
+.template-toggle-row .field-row__tooltip {
+  position: static;
+}
+.template-toggle-row .field-row__tooltip-bubble {
+  top: calc(100% + 8px);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  width: auto;
+  max-width: none;
+  transform: translateY(-4px);
+}
+.template-toggle-row .field-row__tooltip:hover .field-row__tooltip-bubble,
+.template-toggle-row .field-row__tooltip:focus-within .field-row__tooltip-bubble {
+  transform: translateY(0);
+}
+.template-toggle-row .field-row__tooltip-bubble::after {
+  display: none;
 }
 
 .template-number-grid {

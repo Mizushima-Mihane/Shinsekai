@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Play, RotateCw, Save, Sparkles, Users } from "lucide-react";
+import { CircleHelp, Play, RotateCw, Save, Sparkles, Users } from "lucide-react";
 
 import { backgroundsQueryKey, listBackgrounds } from "../../entities/background/repository";
 import { charactersQueryKey, listCharacters } from "../../entities/character/repository";
@@ -87,8 +87,8 @@ export function TemplateEditorPage() {
   const [useCg, setUseCg] = useState(false);
   const [useCot, setUseCot] = useState(false);
   const [useChoice, setUseChoice] = useState(true);
-  const [useInterrupt, setUseInterrupt] = useState(true);
-  const [useBatchInput, setUseBatchInput] = useState(true);
+  const [useInterrupt, setUseInterrupt] = useState(false);
+  const [useBatchInput, setUseBatchInput] = useState(false);
   const [useNarration, setUseNarration] = useState(true);
   const [useStat, setUseStat] = useState(true);
   const [maxSpeechChars, setMaxSpeechChars] = useState(0);
@@ -210,8 +210,8 @@ export function TemplateEditorPage() {
     setUseChoice(launchSession.useChoice ?? true);
     setUseNarration(launchSession.useNarration ?? true);
     setUseStat(launchSession.useStat ?? true);
-    setUseInterrupt(launchSession.useInterrupt ?? true);
-    setUseBatchInput(launchSession.useBatchInput ?? true);
+    setUseInterrupt(launchSession.useInterrupt ?? false);
+    setUseBatchInput(launchSession.useBatchInput ?? false);
     setMaxSpeechChars(Number(launchSession.maxSpeechChars) || 0);
     setMaxDialogItems(Number(launchSession.maxDialogItems) || 0);
     setInitSpritePath(launchSession.initSpritePath || "");
@@ -605,6 +605,12 @@ export function TemplateEditorPage() {
     { key: "stat", label: t("template.field.useStat"), setValue: setUseStat, value: useStat },
   ];
 
+  // Per-toggle "?" hint bubbles (only some toggles have one).
+  const optionHints: Record<string, string> = {
+    interrupt: t("template.field.useInterrupt.hint"),
+    batchInput: t("template.field.useBatchInput.hint"),
+  };
+
   return (
     <div className="page template-page">
       <header className="template-page__topbar">
@@ -813,12 +819,31 @@ export function TemplateEditorPage() {
           <p className="template-options-panel__hint">{t("template.optionHelp")}</p>
 
           <div className="template-option-list">
-            {templateOptions.map((option) => (
-              <label className="template-toggle-row" key={option.key}>
-                <span>{option.label}</span>
-                <Switch checked={option.value} onChange={(e) => option.setValue(e.target.checked)} />
-              </label>
-            ))}
+            {templateOptions.map((option) => {
+              const hint = optionHints[option.key];
+              return (
+                <label className="template-toggle-row" key={option.key}>
+                  <span className="template-toggle-row__label">
+                    <span className="template-toggle-row__label-text">{option.label}</span>
+                    {hint ? (
+                      <span className="field-row__tooltip" onClick={(event) => event.preventDefault()}>
+                        <span
+                          aria-describedby={`tpl-hint-${option.key}`}
+                          className="field-row__tooltip-trigger"
+                          tabIndex={0}
+                        >
+                          <CircleHelp aria-hidden className="field-row__tooltip-icon" />
+                        </span>
+                        <span className="field-row__tooltip-bubble" id={`tpl-hint-${option.key}`} role="tooltip">
+                          {hint}
+                        </span>
+                      </span>
+                    ) : null}
+                  </span>
+                  <Switch checked={option.value} onChange={(e) => option.setValue(e.target.checked)} />
+                </label>
+              );
+            })}
           </div>
 
           <div className="template-number-grid">
