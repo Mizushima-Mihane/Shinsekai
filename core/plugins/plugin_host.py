@@ -8,7 +8,6 @@ is available (``main`` entry and/or Settings UI). Safe to call multiple times (i
 
 from __future__ import annotations
 
-import html
 import logging
 from pathlib import Path
 from queue import Queue
@@ -53,6 +52,46 @@ _active_batcher: object | None = None
 def get_active_batcher() -> object | None:
     """Return the currently active :class:`InputBatcher`, or ``None``."""
     return _active_batcher
+
+
+def _record_user_message_to_history(text: str) -> None:
+    """Record one user turn into the chat log and push it to the live stream.
+
+    Shared by the batch flush (combined turn) and the plain non-batch input path,
+    so the user's message shows in history regardless of whether batching is on
+    — previously only the batcher recorded history, so with batching OFF the
+    user's turn never appeared. Routes through the manager's
+    ``record_user_message`` (canonical formatting + HTML escaping +
+    ``data-created-at``) then ``sync_history_entries`` so the entry reaches the
+    React stream instead of only sitting in ``chat_history``.
+    """
+    from core.runtime.app_runtime import try_get_app_runtime
+
+    value = (text or "").strip()
+    if not value:
+        return
+    _rt = try_get_app_runtime()
+    if _rt is None:
+        return
+    ui = getattr(_rt, "ui_update_manager", None)
+    if ui is None:
+        return
+    rec = getattr(ui, "record_user_message", None)
+    if not callable(rec):
+        return
+    try:
+        rec(value)
+    except Exception:
+        logger.exception("record user message to history failed")
+        return
+    sync = getattr(ui, "sync_history_entries", None)
+    if callable(sync):
+        try:
+            sync()
+        except Exception:
+            pass
+
+
 _plugin_manager: PluginManager | None = None
 _plugin_tts_handlers: List["MessageHandler"] = []
 _plugin_ui_handlers: List["UIOutputMessageHandler"] = []
@@ -223,23 +262,10 @@ def wire_user_input_plugins(user_input_queue: Queue) -> Callable[[str], None]:
                 from core.runtime.input_batcher import InputBatcher
 
                 def _record_batch_to_history(messages: List[str]) -> None:
-                    """Record all buffered messages as one combined block."""
-                    _rt = try_get_app_runtime()
-                    if _rt is None or not messages:
+                    """Record the flushed batch as one combined user turn."""
+                    if not messages:
                         return
-                    # Escape user text before it goes into rich-text HTML so that
-                    # <, >, & or full tags render literally instead of being
-                    # parsed as markup (display corruption / link/image injection).
-                    escaped = [html.escape(m) for m in messages]
-                    if len(escaped) == 1:
-                        body = escaped[0]
-                    else:
-                        body = "<br>&nbsp;&nbsp;&nbsp;&nbsp;".join(escaped)
-                    formatted = (
-                        f"<p style='line-height: 135%; letter-spacing: 2px; color:white;'>"
-                        f"<b style='color:white;'>你</b>: {body}</p>"
-                    )
-                    _rt.ui_update_manager.chat_history.append(formatted)
+                    _record_user_message_to_history("\n".join(m for m in messages if m))
 
                 def _tick_indicator(text: str) -> None:
                     _rt = try_get_app_runtime()
@@ -275,6 +301,9 @@ def wire_user_input_plugins(user_input_queue: Queue) -> Callable[[str], None]:
         if batcher is not None:
             batcher.submit(t)
         else:
+            # No batcher (batch input disabled): record the user turn here so it
+            # still shows in history — otherwise nothing records it at all.
+            _record_user_message_to_history(t)
             user_input_queue.put(UserInputMessage(text=t))
 
     if mgr is not None:
