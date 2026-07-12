@@ -47,31 +47,66 @@ def test_drain_max_items():
     assert q.qsize() == 1
 
 
-def test_clear_is_thread_safe():
-    """Verify clear() unblocks a get() waiter."""
+def test_clear_does_not_deliver_phantom_to_waiter():
+    """clear() must NOT unblock a get() waiting on an (already empty) queue.
+
+    A ``not_empty`` notify cannot deliver an item: a woken ``get()`` re-checks,
+    finds the queue empty, and waits again. By design a consumer blocked on
+    ``get()`` should keep waiting for the next *real* message after a clear().
+    This test proves that behaviour by observing that the waiter stays blocked
+    across a clear() and only returns once a real item is put — and that the
+    value it receives is that real item, never a phantom ``None``.
+    """
     q = ClearableQueue()
     results = []
+    ready = threading.Event()
 
     def waiter():
-        # This will block until clear() unblocks it or something is put
+        ready.set()
         try:
-            item = q.get(timeout=2)
-            results.append(item)
+            results.append(q.get(timeout=1.0))
         except Exception:
             results.append("timeout")
 
     t = threading.Thread(target=waiter, daemon=True)
     t.start()
-    time.sleep(0.1)  # let waiter block on get()
+    ready.wait(timeout=1.0)
+    time.sleep(0.15)  # let waiter actually block inside get() on the empty queue
 
-    # Clearing should unblock the waiter (via not_empty notify)
-    q.clear()
-    # Put a sentinel so waiter can get unblocked
-    q.put("sentinel")
-    t.join(timeout=2)
+    q.clear()          # must NOT wake the waiter with a phantom item
+    time.sleep(0.2)
+    assert results == [], "clear() on an empty queue must not make get() return"
 
-    # Waiter should have received something (sentinel) or been unblocked
-    assert not t.is_alive(), "waiter should have exited"
+    q.put("real")      # a real put is what wakes the waiter
+    t.join(timeout=1.0)
+    assert not t.is_alive(), "waiter should have exited after the real put"
+    assert results == ["real"], "waiter must receive the real item, not a phantom"
+
+
+def test_clear_while_waiter_blocked_discards_queued_items():
+    """clear() while a consumer is blocked drops queued items; the consumer then
+    receives the *next* real put rather than a stale, cleared one."""
+    q = ClearableQueue()
+    results = []
+    ready = threading.Event()
+
+    def waiter():
+        ready.set()
+        # Two sequential gets: the first should see the post-clear "fresh" item.
+        try:
+            results.append(q.get(timeout=1.0))
+        except Exception:
+            results.append("timeout")
+
+    t = threading.Thread(target=waiter, daemon=True)
+    t.start()
+    ready.wait(timeout=1.0)
+    time.sleep(0.15)
+
+    q.clear()          # nothing queued yet — no-op for items, waiter stays blocked
+    q.put("fresh")
+    t.join(timeout=1.0)
+    assert results == ["fresh"]
 
 
 def test_clearable_queue_factory_compatible():

@@ -1737,9 +1737,13 @@ class ChatUIWindow(DesktopToolbarMixin, DesktopMenuMixin, QWidget):
             elif et_in == QEvent.Type.KeyPress:
                 if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
                     if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                        # Ctrl+Enter: flush accumulated batch, then send
-                        self.flush_batch.emit()
+                        # Ctrl+Enter: submit the current input into the batcher
+                        # FIRST (send_btn.click -> sendMessage emits
+                        # message_submitted synchronously), THEN flush so the
+                        # current message is committed together with the batch
+                        # instead of being left for a fresh delayed countdown.
                         self.send_btn.click()
+                        self.flush_batch.emit()
                         return True
                     else:
                         # Enter without Ctrl: send normally (accumulate in batch mode)

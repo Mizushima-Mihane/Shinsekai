@@ -12,6 +12,7 @@
     "update_available": "現在: v{local}\n最新: v{remote}\n\nダウンロードページを開きますか？",
     "update_available_detail": "「プラグイン → プラグイン発見 → ソフトウェア更新」からもいつでも更新を確認できます。",
     "notify_submitted": "送信しました。LLM 処理中です...",
+    "notify_interrupted": "中断しました。新しいメッセージを処理中です…",
     "notify_reroll": "返信を再生成中…",
     "notify_tool_calling": "ツールを呼び出しています：{name}",
     "err_no_valid_dialog": "復元可能なアシスタントの dialog がありません",

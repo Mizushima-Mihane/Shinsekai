@@ -333,17 +333,23 @@ class LLMManager:
         self._chat_depth = 0
         self._turn_state: Optional[_ChatTurnState] = None
         self._history_file = history_file
-        self._cancel_requested = False
+        # Per-turn cancel token. A fresh Event is created for each *outer* chat
+        # turn (see :meth:`chat`); nested tool-triggered chats reuse it. Because
+        # each turn holds its own Event object, a new turn can never reset the
+        # cancel state of an in-flight prior turn (see :meth:`cancel_current_chat`).
+        self._current_cancel_event: Optional[threading.Event] = None
         # 设置日志
         self.logger = logger
 
     def cancel_current_chat(self) -> None:
         """Request cancellation of the current :meth:`chat` call.
 
-        Sets the internal flag so stream loops exit early, and calls the
-        adapter's ``cancel()`` to close the underlying HTTP connection.
+        Sets the current turn's cancel token so its stream loops exit early, and
+        calls the adapter's ``cancel()`` to close the underlying HTTP connection.
         """
-        self._cancel_requested = True
+        ev = self._current_cancel_event
+        if ev is not None:
+            ev.set()
         if self.llm_adapter is not None:
             try:
                 self.llm_adapter.cancel()
@@ -802,8 +808,12 @@ class LLMManager:
         first_user_turn = outer_chat and user_input is not None and not self._has_conversation_history()
         if outer_chat:
             self._begin_chat_turn(first_user_turn=first_user_turn)
+            # Fresh cancel token for this turn. Only outer turns rotate the
+            # token — nested tool-triggered chats reuse it, so an interrupt
+            # raised mid-turn is not cleared by the tool loop, and a brand-new
+            # turn can never reset a still-running prior turn's cancel state.
+            self._current_cancel_event = threading.Event()
         self._chat_depth += 1
-        self._cancel_requested = False
         # 清理孤立的 tool_calls（必须在加 user 消息之前，否则占位 tool 回执会插在 user 后面）
         self._strip_orphaned_tool_calls()
 
@@ -958,6 +968,9 @@ class LLMManager:
     # llm_manager.py 修正核心片段
 
     def _chat_with_tools_stream(self, **kwargs) -> Generator[Union[str, dict[str, str]], None, None]:
+        # Capture this turn's cancel token locally so a later turn that replaces
+        # self._current_cancel_event cannot silence our cancellation checks.
+        cancel_event = self._current_cancel_event
         tools_defs = self._current_tool_definitions()
 
         # Gemini's OpenAI-compatible streaming endpoint omits thought_signature from
@@ -1019,20 +1032,28 @@ class LLMManager:
         try:
             if isinstance(self.llm_adapter, ClaudeAdapter):
                 with response_stream as stream:
-                    for event in stream:
-                        if self._cancel_requested:
-                            break
-                        if event.type == "content_block_delta" and event.delta.type == "text_delta":
-                            yield event.delta.text
-                            collected_content += event.delta.text
-                        elif event.type == "content_block_start" and event.content_block.type == "tool_use":
-                            has_tool_use = True
-                            full_tool_calls[event.index] = {"id": event.content_block.id, "name": event.content_block.name, "input": ""}
-                        elif event.type == "record_delta" and event.delta.type == "input_json_delta":
-                            full_tool_calls[event.index]["input"] += event.delta.partial_json
+                    # Expose the *entered* (closeable) MessageStream so that
+                    # cancel_current_chat() -> adapter.cancel() can abort this
+                    # request. The MessageStreamManager returned by .stream()
+                    # has no .close(); only the entered stream does.
+                    self.llm_adapter._current_stream = stream
+                    try:
+                        for event in stream:
+                            if cancel_event and cancel_event.is_set():
+                                break
+                            if event.type == "content_block_delta" and event.delta.type == "text_delta":
+                                yield event.delta.text
+                                collected_content += event.delta.text
+                            elif event.type == "content_block_start" and event.content_block.type == "tool_use":
+                                has_tool_use = True
+                                full_tool_calls[event.index] = {"id": event.content_block.id, "name": event.content_block.name, "input": ""}
+                            elif event.type == "record_delta" and event.delta.type == "input_json_delta":
+                                full_tool_calls[event.index]["input"] += event.delta.partial_json
+                    finally:
+                        self.llm_adapter._current_stream = None
             else:
                 for chunk in response_stream:
-                    if self._cancel_requested:
+                    if cancel_event and cancel_event.is_set():
                         break
                     if not chunk or not chunk.choices: continue
                     delta = chunk.choices[0].delta
@@ -1053,7 +1074,7 @@ class LLMManager:
                         yield delta.content
                         collected_content += delta.content
         except Exception as exc:
-            if self._cancel_requested:
+            if cancel_event and cancel_event.is_set():
                 return
             stream_failed = True
             self._log_llm_request_failed(
@@ -1075,7 +1096,7 @@ class LLMManager:
                     tool_call_count=len(full_tool_calls),
                 )
 
-        if self._cancel_requested:
+        if cancel_event and cancel_event.is_set():
             return
 
         if has_tool_use:
@@ -1106,13 +1127,15 @@ class LLMManager:
                     func_name = call['function']['name']
                 self.add_message("tool", result, tool_call_id=call['id'], name=func_name)
 
-            if self._cancel_requested:
+            if cancel_event and cancel_event.is_set():
                 return
             yield from self._chat_with_tools_stream(**kwargs)
         else:
             self._persist_plain_assistant_turn(collected_content, collected_reasoning)
 
     def _chat_with_tools_sync(self, **kwargs) -> str:
+        # Capture this turn's cancel token locally (see _chat_with_tools_stream).
+        cancel_event = self._current_cancel_event
         tools_defs = self._current_tool_definitions()
         merged_kwargs = dict(self.generation_config)
         merged_kwargs.update(kwargs)
@@ -1155,7 +1178,7 @@ class LLMManager:
             )
             return ""
 
-        if self._cancel_requested:
+        if cancel_event and cancel_event.is_set():
             return ""
 
         content = ""
@@ -1210,7 +1233,7 @@ class LLMManager:
                     func_name = call['function']['name']
                 self.add_message("tool", result, tool_call_id=call['id'], name=func_name)
 
-            if self._cancel_requested:
+            if cancel_event and cancel_event.is_set():
                 return ""
             return self._chat_with_tools_sync(**kwargs)
         else:

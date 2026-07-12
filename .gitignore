@@ -45,6 +45,9 @@ runtime/
 !core/runtime/**
 !/frontend/src-tauri/src/runtime
 !/frontend/src-tauri/src/runtime/**
+# 保留运行时相关单测目录 / Keep the runtime unit-test directory
+!test/unit/runtime
+!test/unit/runtime/**
 /wheels
 # 项目构建、临时导出文件 / Build & temp export files
 /out

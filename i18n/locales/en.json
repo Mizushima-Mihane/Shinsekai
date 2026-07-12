@@ -15,6 +15,7 @@
     "update_available": "Current: v{local}\nLatest: v{remote}\n\nGo to the download page?",
     "update_available_detail": "You can also check for updates anytime in Plugins → Discover → Software Update.",
     "notify_submitted": "Message sent, waiting for the LLM…",
+    "notify_interrupted": "Interrupted — handling your new message…",
     "notify_reroll": "Regenerating reply…",
     "notify_tool_calling": "Calling tool: {name}",
     "err_no_valid_dialog": "No valid assistant dialog to restore",

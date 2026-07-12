@@ -8,6 +8,7 @@ is available (``main`` entry and/or Settings UI). Safe to call multiple times (i
 
 from __future__ import annotations
 
+import html
 import logging
 from pathlib import Path
 from queue import Queue
@@ -226,10 +227,14 @@ def wire_user_input_plugins(user_input_queue: Queue) -> Callable[[str], None]:
                     _rt = try_get_app_runtime()
                     if _rt is None or not messages:
                         return
-                    if len(messages) == 1:
-                        body = messages[0]
+                    # Escape user text before it goes into rich-text HTML so that
+                    # <, >, & or full tags render literally instead of being
+                    # parsed as markup (display corruption / link/image injection).
+                    escaped = [html.escape(m) for m in messages]
+                    if len(escaped) == 1:
+                        body = escaped[0]
                     else:
-                        body = "<br>&nbsp;&nbsp;&nbsp;&nbsp;".join(messages)
+                        body = "<br>&nbsp;&nbsp;&nbsp;&nbsp;".join(escaped)
                     formatted = (
                         f"<p style='line-height: 135%; letter-spacing: 2px; color:white;'>"
                         f"<b style='color:white;'>你</b>: {body}</p>"

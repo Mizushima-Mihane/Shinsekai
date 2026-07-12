@@ -35,6 +35,11 @@ class AppRuntime:
     ui_playback: UiPlaybackBridge = field(default_factory=UiPlaybackBridge)
     cancellation_requested: Any = field(default_factory=lambda: __import__('threading').Event())
     generating: Any = field(default_factory=lambda: __import__('threading').Event())
+    # Monotonic interrupt counter — bumped by request_interrupt(), never reset.
+    # Consumers (e.g. TTSWorker) snapshot it around slow work to detect that an
+    # interrupt happened even after cancellation_requested has been cleared by
+    # the next turn.
+    interrupt_generation: int = 0
     ui_worker: Any = None
 
 
@@ -100,6 +105,15 @@ def is_anything_running() -> bool:
         return True
     if rt.audio_path_queue is not None and not rt.audio_path_queue.empty():
         return True
+    # Audio may still be *playing* on the dialog channel even after both queues
+    # have drained. Treat that as running so a new message interrupts current
+    # playback instead of overlapping it.
+    try:
+        ch = rt.ui_playback.dialog_channel
+        if ch is not None and ch.get_busy():
+            return True
+    except Exception:
+        pass
     return False
 
 
@@ -133,6 +147,10 @@ def request_interrupt() -> None:
 
     # 1. Signal cancellation — LLMWorker stream loop will break on this
     rt.cancellation_requested.set()
+    # Bump the monotonic interrupt generation. Unlike cancellation_requested
+    # (cleared by the next turn's LLMWorker), this only ever increases, so
+    # in-flight TTS synthesis can still detect that an interrupt occurred.
+    rt.interrupt_generation += 1
 
     # 2. Abort the in-flight LLM API request
     if rt.llm_manager is not None:

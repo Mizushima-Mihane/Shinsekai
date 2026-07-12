@@ -53,8 +53,15 @@ class InputBatcher:
     # ------------------------------------------------------------------
 
     def submit(self, text: str) -> None:
-        """Buffer a user message.  Resets any pending countdown."""
+        """Buffer a user message.  Resets any pending countdown.
+
+        When batching is disabled, any messages still buffered from a prior
+        enabled period are flushed (in order) *before* the current one is sent,
+        so nothing is left stranded waiting for a countdown that may never run.
+        """
         if not self._enabled_factory():
+            # Drain earlier buffered messages first, then send the current one.
+            self.flush()
             self._sink(UserInputMessage(text=text))
             return
 
@@ -64,11 +71,14 @@ class InputBatcher:
 
     def schedule_flush(self) -> None:
         """Start the idle countdown (called when input box becomes empty)."""
+        text: Optional[str] = None
         with self._lock:
             if not self._buffer:
                 return
             self._countdown = self._idle_seconds
-            self._notify_tick_locked()
+            text = self._tick_text_locked()
+        # Invoke the callback OUTSIDE the lock (it may re-enter this batcher).
+        self._emit_tick(text)
 
     def on_countdown_tick(self) -> bool:
         """Called once per second by an external QTimer.
@@ -76,15 +86,18 @@ class InputBatcher:
         Returns ``True`` when the countdown reached zero and the buffer
         should be flushed immediately.
         """
+        text: Optional[str] = None
         with self._lock:
             if self._countdown <= 0 or not self._buffer:
                 return False
             self._countdown -= 1
-            if self._countdown > 0:
-                self._notify_tick_locked()
-                return False
-            # countdown reached 0 — caller MUST flush
-            return True
+            if self._countdown <= 0:
+                # countdown reached 0 — caller MUST flush
+                return True
+            text = self._tick_text_locked()
+        # Invoke the callback OUTSIDE the lock (it may re-enter this batcher).
+        self._emit_tick(text)
+        return False
 
     def on_user_typing(self) -> str:
         """User is typing — cancel countdown, return indicator text."""
@@ -132,11 +145,29 @@ class InputBatcher:
     # Internal
     # ------------------------------------------------------------------
 
-    def _notify_tick_locked(self) -> None:
-        if self._tick_cb:
-            n = self._countdown
-            text = f"[正在输入…{n}]" if n > 0 else ""
-            try:
-                self._tick_cb(text)
-            except Exception:
-                pass
+    def _tick_text_locked(self) -> Optional[str]:
+        """Compute the indicator text for the current countdown.
+
+        Call **while holding** ``self._lock`` — it only reads state, never
+        invokes the callback.  Returns ``None`` when no callback is registered
+        (so the caller can skip emitting entirely).
+        """
+        if not self._tick_cb:
+            return None
+        n = self._countdown
+        return f"[正在输入…{n}]" if n > 0 else ""
+
+    def _emit_tick(self, text: Optional[str]) -> None:
+        """Invoke the tick callback **outside** ``self._lock``.
+
+        Keeping the callback out of the critical section avoids a re-entrant
+        deadlock: the callback is external and may call back into this batcher
+        (e.g. read :attr:`pending_count` or call :meth:`cancel`), which would
+        try to re-acquire the same non-reentrant lock.
+        """
+        if text is None or not self._tick_cb:
+            return
+        try:
+            self._tick_cb(text)
+        except Exception:
+            pass

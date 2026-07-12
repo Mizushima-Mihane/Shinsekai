@@ -75,12 +75,17 @@ def wire_chat_ui_bridge(
 
         # --- Interrupt active generation / playback ---
         from core.runtime.app_runtime import is_anything_running, request_interrupt, _interrupt_enabled
-        if is_anything_running() and _interrupt_enabled():
+        interrupted = is_anything_running() and _interrupt_enabled()
+        if interrupted:
             request_interrupt()
-            ctx.set_notification_hint("已打断，正在处理新消息…")
 
         emit_user_text(message)
-        ctx.set_notification_hint(_tr("main.notify_submitted"))
+        # Set the notification once, AFTER emit_user_text, so an interrupt hint
+        # is not immediately overwritten by the submitted hint. Use a localized
+        # key instead of hard-coded text.
+        ctx.set_notification_hint(
+            _tr("main.notify_interrupted") if interrupted else _tr("main.notify_submitted")
+        )
 
     def on_reroll() -> None:
         from core.sprite.chat_history import pop_last_assistant_turn

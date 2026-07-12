@@ -12,6 +12,7 @@
     "update_available": "当前版本: v{local}\n最新版本: v{remote}\n\n是否前往下载页更新？",
     "update_available_detail": "你也可以在 插件 → 发现插件 → 软件更新 中随时检查更新。",
     "notify_submitted": "您的消息已提交，正在等待 LLM 处理...",
+    "notify_interrupted": "已打断，正在处理新消息…",
     "notify_reroll": "正在重新生成回复...",
     "notify_tool_calling": "正在调用工具：{name}",
     "err_no_valid_dialog": "没有可恢复的有效 assistant 对话",

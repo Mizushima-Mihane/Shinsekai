@@ -28,7 +28,12 @@ class ClearableQueue(Queue):
             if self.unfinished_tasks == 0:
                 self.all_tasks_done.notify_all()
             self.not_full.notify_all()
-            self.not_empty.notify_all()  # unblock any waiting get()
+            # NOTE: we deliberately do NOT notify ``not_empty`` here. A waiter
+            # woken on an *empty* queue would just re-check, find nothing, and
+            # wait again — the notify cannot deliver an item. By design a
+            # consumer blocked on ``get()`` should keep waiting for the next
+            # real message after a clear(); shutdown wakes it with a ``None``
+            # sentinel via ``put(None)`` instead.
 
     def drain(self, max_items: Optional[int] = None) -> List[object]:
         """Drain up to *max_items* from the queue **without blocking**.

@@ -375,13 +375,24 @@ class TTSWorker(QThreadDagNode):
                 got_item = True
                 if item is None:
                     break
-                if get_app_runtime().cancellation_requested.is_set():
+                rt = get_app_runtime()
+                if rt.cancellation_requested.is_set():
                     continue
+                # Snapshot the monotonic interrupt generation BEFORE synthesis.
+                # request_interrupt() only ever increments it, so — unlike
+                # cancellation_requested, which the next turn's LLMWorker clears —
+                # it reliably reports an interrupt that landed *during* this
+                # dispatch, closing the race where audio synthesized for an
+                # interrupted turn leaks into the following turn.
+                interrupt_gen = rt.interrupt_generation
                 with tracker.track("TTS dispatch"):
                     self.tts_message_dispatcher.dispatch(item)
-                # If we were cancelled mid-synthesis, discard stale audio output
-                # (dispatch already pushed to audio_path_queue internally).
-                if get_app_runtime().cancellation_requested.is_set():
+                # If an interrupt landed mid-synthesis, discard the stale audio
+                # (dispatch already pushed it to audio_path_queue internally).
+                if (
+                    rt.cancellation_requested.is_set()
+                    or rt.interrupt_generation != interrupt_gen
+                ):
                     self.audio_path_queue.clear()
             except Exception as e:
                 logger.exception("TTS worker task failed", extra={"event": "tts.worker.failed"})

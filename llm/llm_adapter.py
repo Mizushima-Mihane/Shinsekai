@@ -256,13 +256,23 @@ class ClaudeAdapter(LLMAdapter):
         self.system_prompt = ''
 
     def cancel(self) -> None:
-        """Close the active Claude stream/response to abort an in-flight request."""
-        if self._current_stream is not None:
+        """Abort an in-flight Claude request by closing the active stream.
+
+        ``self._current_stream`` is the *entered* ``MessageStream`` (assigned by
+        the manager after ``with ... as stream``), which exposes ``close()``.
+        The ``MessageStreamManager`` returned by ``client.messages.stream()``
+        has no ``close()``, so we guard on the attribute and — importantly — do
+        NOT drop the reference when we cannot close it, so a subsequent attempt
+        can still find the active stream.
+        """
+        stream = self._current_stream
+        if stream is not None and hasattr(stream, "close"):
             try:
-                self._current_stream.close()
+                stream.close()
             except Exception:
                 pass
-            self._current_stream = None
+            else:
+                self._current_stream = None
         self._current_response = None
 
     def set_user_template(self, template: str):
@@ -380,7 +390,11 @@ class ClaudeAdapter(LLMAdapter):
                     max_tokens=kwargs.get("max_tokens", 4096),
                     temperature=kwargs.get("temperature", 0.7)
                 )
-                self._current_stream = stream_obj
+                # Do NOT store the manager: client.messages.stream() returns a
+                # MessageStreamManager with no .close(). The caller enters the
+                # context and assigns self._current_stream to the entered
+                # (closeable) MessageStream so cancel() can abort the request.
+                self._current_stream = None
                 return stream_obj
             else:
                 resp = self.client.messages.create(
