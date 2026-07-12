@@ -104,8 +104,8 @@ class ApiConfig(BaseModel):
     is_streaming: DefaultIfNone[bool] = Field(default=True, description="是否使用流式响应")
     # --- Interrupt & Batch Input ---
     interrupt_enabled: DefaultIfNone[bool] = Field(default=True, description="是否启用打断功能：新消息可中断正在生成的回复")
-    is_batch_input_enabled: DefaultIfNone[bool] = Field(default=False, description="启用批量消息输入：连续发送多条后合并为一条")
-    batch_input_timeout: DefaultIfNone[float] = Field(default=5.0, description="输入框空闲等待时间（秒）：空输入这么长后自动提交批量消息", ge=0.3, le=120.0)
+    is_batch_input_enabled: DefaultIfNone[bool] = Field(default=True, description="启用批量消息输入：连续发送多条后合并为一条")
+    batch_input_timeout: DefaultIfNone[float] = Field(default=3.0, description="输入框空闲等待时间（秒）：空输入这么长后自动提交批量消息", ge=0.3, le=120.0)
     batch_input_separator: DefaultIfNone[str] = Field(default="\n---\n", description="合并批量消息的分隔符")
     temperature: DefaultIfNone[float] = Field(default=0.7, description="LLM 采样温度")
     repetition_penalty: DefaultIfNone[float] = Field(default=1.0, description="重复惩罚")
