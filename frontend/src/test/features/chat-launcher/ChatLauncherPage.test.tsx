@@ -230,6 +230,7 @@ describe("ChatLauncherPage", () => {
       useCot: true,
       useEffect: false,
       useInterrupt: true,
+      useBatchInput: true,
       useNarration: true,
       useStat: false,
       useTranslation: true,

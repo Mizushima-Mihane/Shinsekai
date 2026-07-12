@@ -49,6 +49,7 @@ function templateSession(overrides: Partial<TemplateLaunchSession> = {}): Templa
     useCot: false,
     useEffect: true,
     useInterrupt: true,
+    useBatchInput: true,
     useNarration: true,
     useStat: true,
     useTranslation: true,

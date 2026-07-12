@@ -332,6 +332,7 @@ def _launch_chat(
     system_template: str,
     use_cg: bool,
     use_interrupt: bool = True,
+    use_batch_input: bool = True,
     user_scenario: str,
     stream_endpoint: str = "",
     workflow_path: str = "",
@@ -390,6 +391,8 @@ def _launch_chat(
         env["SHINSEKAI_SUPPRESS_MAIN_ERROR_DIALOG"] = "1"
         if not use_interrupt:
             env["SHINSEKAI_INTERRUPT_DISABLED"] = "1"
+        if not use_batch_input:
+            env["SHINSEKAI_BATCH_INPUT_DISABLED"] = "1"
 
         if getattr(sys, "frozen", False):
             candidates = _main_exe_candidates(state)

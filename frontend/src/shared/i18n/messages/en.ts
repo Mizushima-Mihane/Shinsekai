@@ -901,6 +901,7 @@ export const enMessages: Record<MessageKey, string> = {
   "template.field.useCot": "COT prompt",
   "template.field.useEffect": "Visual effects",
   "template.field.useInterrupt": "Enable interrupt",
+  "template.field.useBatchInput": "Enable batch input",
   "template.field.useNarration": "Narration rules",
   "template.field.useStat": "Stat rules",
   "template.field.useTranslation": "LLM translation",

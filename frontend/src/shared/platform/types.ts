@@ -469,6 +469,7 @@ export interface ChatLaunchPayload {
   templateId: string;
   useCg?: boolean;
   useInterrupt?: boolean;
+  useBatchInput?: boolean;
 }
 
 export interface TemplateGenerateInput {
@@ -508,6 +509,7 @@ export interface TemplateLaunchSession {
   useCot: boolean;
   useEffect: boolean;
   useInterrupt: boolean;
+  useBatchInput: boolean;
   useNarration: boolean;
   useStat: boolean;
   useTranslation: boolean;

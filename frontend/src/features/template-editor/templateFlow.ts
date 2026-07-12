@@ -25,6 +25,7 @@ export interface TemplateFlowOptions {
   useCot: boolean;
   useEffect: boolean;
   useInterrupt: boolean;
+  useBatchInput: boolean;
   useNarration: boolean;
   useStat: boolean;
   useTranslation: boolean;
@@ -143,6 +144,7 @@ export function buildTemplateLaunchSession(input: {
     selectedCharacters: input.selectedCharacters,
     system: String(input.draft.system ?? ""),
     templateFileDropdown: input.selectedTemplateId,
+    useBatchInput: input.options.useBatchInput,
     useCg: input.options.useCg,
     useChoice: input.options.useChoice,
     useCot: input.options.useCot,
@@ -164,6 +166,7 @@ export function buildChatLaunchPayload(input: {
   template: TemplateSummary;
   useCg: boolean;
   useInterrupt: boolean;
+  useBatchInput: boolean;
 }): ChatLaunchPayload {
   return {
     backgroundName: input.backgroundName,
@@ -179,5 +182,6 @@ export function buildChatLaunchPayload(input: {
     templateName: input.template.name,
     useCg: input.useCg,
     useInterrupt: input.useInterrupt,
+    useBatchInput: input.useBatchInput,
   };
 }

@@ -139,6 +139,7 @@ export function ChatLauncherPage() {
     useCot: launchSession?.useCot ?? false,
     useEffect: launchSession?.useEffect ?? true,
     useInterrupt: launchSession?.useInterrupt ?? true,
+    useBatchInput: launchSession?.useBatchInput ?? true,
     useNarration: launchSession?.useNarration ?? true,
     useStat: launchSession?.useStat ?? true,
     useTranslation: launchSession?.useTranslation ?? true,

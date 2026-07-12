@@ -840,6 +840,7 @@ export type MessageKey =
   | "template.field.useCot"
   | "template.field.useEffect"
   | "template.field.useInterrupt"
+  | "template.field.useBatchInput"
   | "template.field.useNarration"
   | "template.field.useStat"
   | "template.field.useTranslation"

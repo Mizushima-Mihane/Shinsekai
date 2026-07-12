@@ -88,6 +88,7 @@ export function TemplateEditorPage() {
   const [useCot, setUseCot] = useState(false);
   const [useChoice, setUseChoice] = useState(true);
   const [useInterrupt, setUseInterrupt] = useState(true);
+  const [useBatchInput, setUseBatchInput] = useState(true);
   const [useNarration, setUseNarration] = useState(true);
   const [useStat, setUseStat] = useState(true);
   const [maxSpeechChars, setMaxSpeechChars] = useState(0);
@@ -210,6 +211,7 @@ export function TemplateEditorPage() {
     setUseNarration(launchSession.useNarration ?? true);
     setUseStat(launchSession.useStat ?? true);
     setUseInterrupt(launchSession.useInterrupt ?? true);
+    setUseBatchInput(launchSession.useBatchInput ?? true);
     setMaxSpeechChars(Number(launchSession.maxSpeechChars) || 0);
     setMaxDialogItems(Number(launchSession.maxDialogItems) || 0);
     setInitSpritePath(launchSession.initSpritePath || "");
@@ -277,6 +279,7 @@ export function TemplateEditorPage() {
     useCot,
     useEffect: useEffectPrompt,
     useInterrupt,
+    useBatchInput,
     useNarration,
     useStat,
     useTranslation,
@@ -502,6 +505,7 @@ export function TemplateEditorPage() {
           template,
           useCg,
           useInterrupt,
+          useBatchInput,
         }),
       );
       return { snapshot, template };
@@ -594,6 +598,7 @@ export function TemplateEditorPage() {
     },
     { key: "cg", label: t("template.field.useCg"), setValue: setUseCg, value: useCg },
     { key: "interrupt", label: t("template.field.useInterrupt"), setValue: setUseInterrupt, value: useInterrupt },
+    { key: "batchInput", label: t("template.field.useBatchInput"), setValue: setUseBatchInput, value: useBatchInput },
     { key: "cot", label: t("template.field.useCot"), setValue: setUseCot, value: useCot },
     { key: "choice", label: t("template.field.useChoice"), setValue: setUseChoice, value: useChoice },
     { key: "narration", label: t("template.field.useNarration"), setValue: setUseNarration, value: useNarration },

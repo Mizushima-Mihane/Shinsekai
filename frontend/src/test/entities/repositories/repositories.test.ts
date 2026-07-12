@@ -123,6 +123,7 @@ describe("entity repositories", () => {
       useCot: false,
       useEffect: true,
       useInterrupt: true,
+      useBatchInput: true,
       useNarration: true,
       useStat: true,
       useTranslation: true,

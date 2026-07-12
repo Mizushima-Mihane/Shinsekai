@@ -256,6 +256,9 @@ def main():
     # Allow the launcher to disable interrupt by env var
     if os.environ.get("SHINSEKAI_INTERRUPT_DISABLED") == "1":
         config.config.api_config.interrupt_enabled = False
+    # Allow the launcher to disable batch input by env var
+    if os.environ.get("SHINSEKAI_BATCH_INPUT_DISABLED") == "1":
+        config.config.api_config.is_batch_input_enabled = False
     with _startup_phase("i18n.import"):
         from i18n import init_i18n, tr as tr_i18n, tr_in_bundle
         from asr.asr_adapter import system_config_to_asr_lang

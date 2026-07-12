@@ -900,6 +900,7 @@ export const jaMessages: Record<MessageKey, string> = {
   "template.field.useCot": "COT プロンプト",
   "template.field.useEffect": "演出効果",
   "template.field.useInterrupt": "中断を有効化",
+  "template.field.useBatchInput": "バッチ入力を有効化",
   "template.field.useNarration": "ナレーションルール",
   "template.field.useStat": "ステータスルール",
   "template.field.useTranslation": "LLM 翻訳",
