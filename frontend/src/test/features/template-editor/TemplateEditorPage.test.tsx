@@ -205,6 +205,7 @@ describe("TemplateEditorPage", () => {
       useChoice: false,
       useCot: true,
       useEffect: false,
+      useInterrupt: true,
       useNarration: true,
       useStat: false,
       useTranslation: true,

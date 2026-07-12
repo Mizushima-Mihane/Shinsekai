@@ -688,6 +688,7 @@ describe("http platform", () => {
       useChoice: true,
       useCot: false,
       useEffect: true,
+      useInterrupt: true,
       useNarration: true,
       useStat: true,
       useTranslation: true,

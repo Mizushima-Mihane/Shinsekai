@@ -122,6 +122,7 @@ describe("entity repositories", () => {
       useChoice: true,
       useCot: false,
       useEffect: true,
+      useInterrupt: true,
       useNarration: true,
       useStat: true,
       useTranslation: true,

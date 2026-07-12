@@ -138,6 +138,7 @@ export function ChatLauncherPage() {
     useChoice: launchSession?.useChoice ?? true,
     useCot: launchSession?.useCot ?? false,
     useEffect: launchSession?.useEffect ?? true,
+    useInterrupt: launchSession?.useInterrupt ?? true,
     useNarration: launchSession?.useNarration ?? true,
     useStat: launchSession?.useStat ?? true,
     useTranslation: launchSession?.useTranslation ?? true,
