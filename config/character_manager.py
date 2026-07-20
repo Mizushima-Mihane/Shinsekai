@@ -20,7 +20,23 @@ def _sprite_field(sprite_data: Union[Sprite, dict], key: str, default: Any = "")
     return sprite_data.get(key, default)
 
 
-def _voice_filename_for_sprite(sprite_data: Union[Sprite, dict], sprite_index: int, file_ext: str) -> str:
+def _file_content_digest(path: str) -> str:
+    """Short SHA-1 of a file's bytes, or "" when it cannot be read."""
+    if not path or not os.path.isfile(path):
+        return ""
+    try:
+        digest = hashlib.sha1()
+        with open(path, "rb") as handle:
+            for chunk in iter(lambda: handle.read(1 << 16), b""):
+                digest.update(chunk)
+        return digest.hexdigest()[:10]
+    except OSError:
+        return ""
+
+
+def _voice_filename_for_sprite(
+    sprite_data: Union[Sprite, dict], sprite_index: int, file_ext: str, voice_file: str = "",
+) -> str:
     sprite_path = str(_sprite_field(sprite_data, "path", "") or "")
     sprite_stem = Path(sprite_path).stem
     safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "_", sprite_stem).strip("._-")
@@ -28,7 +44,13 @@ def _voice_filename_for_sprite(sprite_data: Union[Sprite, dict], sprite_index: i
         safe_stem = f"sprite_{sprite_index:02d}"
     digest_source = sprite_path or safe_stem or str(sprite_index)
     digest = hashlib.sha1(digest_source.encode("utf-8")).hexdigest()[:10]
-    return f"voice_{safe_stem}_{digest}{file_ext}"
+    # Include a hash of the uploaded audio's bytes so replacing a sprite's
+    # reference voice yields a NEW filename.  GPT-SoVITS caches reference-audio
+    # features by path, so overwriting the same path would keep serving the
+    # first reference even after the user switches or deletes it.
+    content = _file_content_digest(voice_file)
+    suffix = f"_{content}" if content else ""
+    return f"voice_{safe_stem}_{digest}{suffix}{file_ext}"
 
 
 def _is_path_inside_directory(path: str, directory: str) -> bool:
@@ -540,7 +562,7 @@ class CharacterManager:
         Path(voice_char_dir).mkdir(parents=True, exist_ok=True)
         
         file_ext = Path(voice_file).suffix
-        voice_filename = _voice_filename_for_sprite(sprite_data, sprite_index, file_ext)
+        voice_filename = _voice_filename_for_sprite(sprite_data, sprite_index, file_ext, voice_file)
         voice_path = os.path.join(voice_char_dir, voice_filename)
         shutil.copyfile(voice_file, voice_path)
         
