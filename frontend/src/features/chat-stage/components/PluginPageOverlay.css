@@ -55,19 +55,21 @@
 }
 
 .plugin-overlay__bar:active .plugin-overlay__grip {
-  background: rgba(255, 255, 255, 0.7);
+  transform: scaleX(1.06);
 }
 
 .plugin-overlay__bar:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.82);
+  outline: 2px solid var(--overlay-grip, rgba(255, 255, 255, 0.82));
   outline-offset: -3px;
 }
 
+/* Grip color follows the bar: a theme-driven (light) bar sets --overlay-grip to
+   a dark tone via inline style; the neutral dark fallback bar keeps the light one. */
 .plugin-overlay__grip {
   width: 84px;
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--overlay-grip, rgba(255, 255, 255, 0.45));
 }
 
 @keyframes plugin-overlay-in {

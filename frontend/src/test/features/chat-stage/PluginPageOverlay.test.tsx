@@ -32,6 +32,7 @@ function renderOverlay(
 describe("PluginPageOverlay", () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
+    window.localStorage.clear();
     window.history.replaceState({}, "", "/");
     Object.defineProperty(window, "innerHeight", { configurable: true, value: 620, writable: true });
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 360, writable: true });
@@ -65,6 +66,23 @@ describe("PluginPageOverlay", () => {
         "?pluginId=demo.plugin&pageId=dashboard&shinsekai_bridge_token=secret",
     );
     expect(overlay).toHaveStyle({ height: "604px", left: "8px", top: "8px", width: "344px" });
+  });
+
+  it("mounts a contribution-provided page immediately without a detail request", async () => {
+    vi.stubEnv("VITE_SHINSEKAI_API_BASE", "http://127.0.0.1:8787");
+    renderOverlay(vi.fn(), {
+      frontendUrl: "/api/plugins/demo.plugin/frontend/dashboard/?pluginId=demo.plugin&pageId=dashboard",
+      mode: "overlay",
+      pageId: "dashboard",
+      pageTitle: "Dashboard",
+      pluginId: "demo.plugin",
+    });
+
+    const frame = (await screen.findByTitle("Dashboard")) as HTMLIFrameElement;
+    expect(repository.getUi).not.toHaveBeenCalled();
+    expect(frame.src).toBe(
+      "http://127.0.0.1:8787/api/plugins/demo.plugin/frontend/dashboard/?pluginId=demo.plugin&pageId=dashboard",
+    );
   });
 
   it("closes from the host button and rejects pages not owned by the target plugin", async () => {
@@ -137,5 +155,131 @@ describe("PluginPageOverlay", () => {
       },
       "http://127.0.0.1:8787",
     );
+  });
+
+  it("honors a plugin-declared overlay size and background", async () => {
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 2000, writable: true });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 2000, writable: true });
+    renderOverlay(vi.fn(), {
+      mode: "overlay",
+      overlayBackground: "rgb(43, 26, 36)",
+      overlayHeight: 720,
+      overlayWidth: 420,
+      pageId: "dashboard",
+      pluginId: "demo.plugin",
+    });
+
+    const overlay = await screen.findByRole("dialog", { name: "Dashboard" });
+    expect(overlay).toHaveStyle({ background: "rgb(43, 26, 36)", height: "720px", width: "420px" });
+  });
+
+  it("resizes to a mini silhouette on request and restores on normal", async () => {
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 2000, writable: true });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 2000, writable: true });
+    renderOverlay(vi.fn(), {
+      mode: "overlay",
+      overlayHeight: 720,
+      overlayWidth: 420,
+      pageId: "dashboard",
+      pluginId: "demo.plugin",
+    });
+    const frame = (await screen.findByTitle("Dashboard")) as HTMLIFrameElement;
+    const overlay = screen.getByRole("dialog", { name: "Dashboard" });
+    expect(overlay).toHaveStyle({ height: "720px", width: "420px" });
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { __pluginOverlay: "drag", mini: true, type: "size" },
+          source: frame.contentWindow,
+        }),
+      );
+    });
+    // 420*0.72 -> 302, 720*0.72 -> 518 (both well inside the 2000px viewport)
+    await waitFor(() => expect(overlay).toHaveStyle({ height: "518px", width: "302px" }));
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { __pluginOverlay: "drag", mini: false, type: "size" },
+          source: frame.contentWindow,
+        }),
+      );
+    });
+    await waitFor(() => expect(overlay).toHaveStyle({ height: "720px", width: "420px" }));
+  });
+
+  it("uses the contribution's saved mini state on its first frame", async () => {
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 2000, writable: true });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 2000, writable: true });
+    renderOverlay(vi.fn(), {
+      frontendUrl: "/api/plugins/demo.plugin/frontend/dashboard/",
+      mode: "overlay",
+      overlayHeight: 860,
+      overlayInitialMini: true,
+      overlayWidth: 400,
+      pageId: "dashboard",
+      pageTitle: "Dashboard",
+      pluginId: "demo.plugin",
+    });
+
+    const overlay = await screen.findByRole("dialog", { name: "Dashboard" });
+    expect(overlay).toHaveStyle({ height: "619px", width: "288px" });
+    expect(repository.getUi).not.toHaveBeenCalled();
+  });
+
+  it("remembers a page's mini state when it is opened again", async () => {
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 2000, writable: true });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 2000, writable: true });
+    const target: PluginPageTarget = {
+      frontendUrl: "/api/plugins/demo.plugin/frontend/dashboard/",
+      mode: "overlay",
+      overlayHeight: 860,
+      overlayWidth: 400,
+      pageId: "dashboard",
+      pageTitle: "Dashboard",
+      pluginId: "demo.plugin",
+    };
+    const first = render(
+      <I18nProvider language="en">
+        <PluginPageOverlay onClose={vi.fn()} target={target} />
+      </I18nProvider>,
+    );
+    const firstFrame = (await screen.findByTitle("Dashboard")) as HTMLIFrameElement;
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { __pluginOverlay: "drag", mini: true, type: "size" },
+          source: firstFrame.contentWindow,
+        }),
+      );
+    });
+    first.unmount();
+    renderOverlay(vi.fn(), target);
+
+    const overlay = await screen.findByRole("dialog", { name: "Dashboard" });
+    expect(overlay).toHaveStyle({ height: "619px", width: "288px" });
+  });
+
+  it("recolors the overlay shell to the theme color the page reports", async () => {
+    renderOverlay(vi.fn(), {
+      mode: "overlay",
+      overlayBackground: "rgb(235, 230, 238)",
+      pageId: "dashboard",
+      pluginId: "demo.plugin",
+    });
+    const frame = (await screen.findByTitle("Dashboard")) as HTMLIFrameElement;
+    const overlay = screen.getByRole("dialog", { name: "Dashboard" });
+    expect(overlay).toHaveStyle({ background: "rgb(235, 230, 238)" });
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { __pluginOverlay: "drag", bg: "rgb(229, 237, 244)", type: "theme" },
+          source: frame.contentWindow,
+        }),
+      );
+    });
+    await waitFor(() => expect(overlay).toHaveStyle({ background: "rgb(229, 237, 244)" }));
   });
 });

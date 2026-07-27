@@ -191,6 +191,20 @@ def test_inject_bridge_token_appends_token_to_frontend_urls():
     assert result["pages"][1]["frontendUrl"].endswith("?shinsekai_bridge_token=secret-token")
 
 
+def test_inject_bridge_token_handles_chat_ui_contribution_urls():
+    handler = _handler_with_auth_token("secret-token")
+    contributions = [
+        {
+            "actionType": "open-plugin-page",
+            "frontendUrl": "/api/plugins/demo/frontend/phone/?pluginId=demo&pageId=phone",
+        }
+    ]
+
+    result = handler._inject_bridge_token({"pages": contributions})["pages"]
+
+    assert result[0]["frontendUrl"].endswith("&shinsekai_bridge_token=secret-token")
+
+
 def test_inject_bridge_token_leaves_non_api_frontend_urls_unchanged():
     handler = _handler_with_auth_token("secret-token")
     detail = {

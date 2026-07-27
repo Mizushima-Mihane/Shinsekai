@@ -62,6 +62,23 @@ def test_wiring_preserves_attachment_payloads() -> None:
     assert message.attachments == attachments
 
 
+def test_wiring_preserves_hidden_runtime_input() -> None:
+    input_queue = Queue()
+    service = create_chat_turn_service(
+        config=make_config(interrupt_enabled=False),
+        user_input_queue=input_queue,
+        tts_queue=ClearableQueue(),
+        audio_queue=ClearableQueue(),
+        llm_manager=MagicMock(),
+        ui_worker=MagicMock(),
+        ui_updates=MagicMock(),
+    )
+
+    service.submit("[call accepted]", hidden=True)
+
+    assert input_queue.get_nowait().hidden is True
+
+
 def test_wiring_clears_downstream_ports_on_interrupt() -> None:
     input_queue = Queue()
     tts_queue = ClearableQueue()

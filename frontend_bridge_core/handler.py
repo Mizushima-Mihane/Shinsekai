@@ -483,7 +483,8 @@ class FrontendBridgeHandler(BaseHTTPRequestHandler):
             elif path == "/api/plugins":
                 self._send_json(_plugin_rows(plugin_load_snapshot(self.state)))
             elif path == "/api/plugins/chat-ui-contributions":
-                self._send_json(_frontend_chat_ui_contribution_payloads())
+                contributions = _frontend_chat_ui_contribution_payloads()
+                self._send_json(self._inject_bridge_token({"pages": contributions})["pages"])
             elif path == "/api/plugins/status":
                 self._send_json(plugin_load_snapshot(self.state))
             elif path.startswith("/api/plugins/") and path.endswith("/ui"):

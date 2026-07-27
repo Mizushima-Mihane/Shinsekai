@@ -335,6 +335,41 @@ def _frontend_chat_ui_contributions() -> list[Any]:
     )
 
 
+def _coerce_int(value: Any) -> int | None:
+    try:
+        if value is None or value == "":
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _overlay_presentation(contribution: Any) -> dict[str, Any]:
+    """Optional overlay sizing/appearance a plugin page may declare (used only
+    when its action mode is "overlay"). Returns only the keys the plugin set, so
+    a page that declares nothing keeps the host default (360x640, transparent)."""
+    out: dict[str, Any] = {}
+    width = _coerce_int(getattr(contribution, "overlay_width", None))
+    if width is not None:
+        out["overlayWidth"] = max(240, min(width, 640))
+    height = _coerce_int(getattr(contribution, "overlay_height", None))
+    if height is not None:
+        out["overlayHeight"] = max(320, min(height, 960))
+    background = getattr(contribution, "overlay_background", None)
+    if isinstance(background, str) and background.strip():
+        out["overlayBackground"] = background.strip()[:120]
+    if bool(getattr(contribution, "overlay_initial_mini", False)):
+        out["overlayInitialMini"] = True
+    return out
+
+
+def _frontend_page_url(plugin_id: str, page_id: str) -> str:
+    return (
+        f"/api/plugins/{quote(plugin_id, safe='')}/frontend/{quote(page_id, safe='')}/"
+        f"?pluginId={quote(plugin_id, safe='')}&pageId={quote(page_id, safe='')}"
+    )
+
+
 def _frontend_chat_ui_action(contribution: Any) -> tuple[str, str, str]:
     """Return (actionType, pageId, pageMode). pageMode is how an open-plugin-page
     contribution presents its page: "navigate" (default) or "overlay" (a floating
@@ -375,25 +410,31 @@ def _frontend_chat_ui_contribution_payloads() -> list[dict[str, Any]]:
         if slot == "chat-top-toolbar":
             presentation = "icon-only"
         variant = str(getattr(contribution, "variant", "") or "ghost").strip()
-        rows.append(
-            {
-                "actionLabel": str(getattr(contribution, "action_label", "") or "").strip() or title,
-                "actionType": action_type,
-                "actionable": action_type != "none",
-                "description": str(getattr(contribution, "description", "") or "").strip()[:500],
-                "icon": icon if icon in allowed_icons else "puzzle",
-                "id": contribution_id,
-                "order": float(getattr(contribution, "order", 100.0) or 100.0),
-                "pageId": page_id,
-                "pageMode": page_mode,
-                "pluginId": plugin_id,
-                "pluginVersion": str(getattr(contribution, "plugin_version", "") or "")[:64],
-                "presentation": presentation if presentation in allowed_presentations else "button",
-                "slot": slot,
-                "title": title[:160],
-                "variant": variant if variant in allowed_variants else "ghost",
-            }
-        )
+        row = {
+            "actionLabel": str(getattr(contribution, "action_label", "") or "").strip() or title,
+            "actionType": action_type,
+            "actionable": action_type != "none",
+            "description": str(getattr(contribution, "description", "") or "").strip()[:500],
+            "icon": icon if icon in allowed_icons else "puzzle",
+            "id": contribution_id,
+            "order": float(getattr(contribution, "order", 100.0) or 100.0),
+            "pageId": page_id,
+            "pageMode": page_mode,
+            "pluginId": plugin_id,
+            "pluginVersion": str(getattr(contribution, "plugin_version", "") or "")[:64],
+            "presentation": presentation if presentation in allowed_presentations else "button",
+            "slot": slot,
+            "title": title[:160],
+            "variant": variant if variant in allowed_variants else "ghost",
+        }
+        if page_mode == "overlay":
+            row.update(_overlay_presentation(contribution))
+        if action_type == "open-plugin-page":
+            page = _frontend_page_contribution(plugin_id, page_id)
+            if page is not None:
+                row["frontendUrl"] = _frontend_page_url(plugin_id, page_id)
+                row["pageTitle"] = str(getattr(page, "title", "") or "").strip()[:160] or page_id
+        rows.append(row)
     return rows
 
 
@@ -483,10 +524,7 @@ def _frontend_page_payload(contribution: Any) -> dict[str, Any]:
     plugin_id = str(getattr(contribution, "plugin_id", "") or "")
     page = {
         "description": str(getattr(contribution, "description", "") or ""),
-        "frontendUrl": (
-            f"/api/plugins/{quote(plugin_id, safe='')}/frontend/{quote(page_id, safe='')}/"
-            f"?pluginId={quote(plugin_id, safe='')}&pageId={quote(page_id, safe='')}"
-        ),
+        "frontendUrl": _frontend_page_url(plugin_id, page_id),
         "id": page_id,
         "kind": kind,
         "order": float(getattr(contribution, "order", 100.0) or 100.0),

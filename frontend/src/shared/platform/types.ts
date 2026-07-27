@@ -199,6 +199,12 @@ export interface PluginSlotContribution {
   icon: PluginSlotContributionIcon;
   id: string;
   order: number;
+  overlayBackground?: string;
+  overlayHeight?: number;
+  overlayInitialMini?: boolean;
+  overlayWidth?: number;
+  pageTitle?: string;
+  frontendUrl?: string;
   pageId: string;
   pageMode?: PluginSlotContributionPageMode;
   pluginId: string;

@@ -546,11 +546,12 @@ export function ChatStagePage() {
   };
 
   const openPluginPage = useCallback(
-    ({ mode, pageId, pluginId }: PluginPageTarget) => {
-      if (mode === "overlay") {
-        setOverlayTarget({ mode, pageId, pluginId });
+    (target: PluginPageTarget) => {
+      if (target.mode === "overlay") {
+        setOverlayTarget(target);
         return;
       }
+      const { pageId, pluginId } = target;
       navigate(
         { pathname: "/settings/plugins", search: location.search },
         {

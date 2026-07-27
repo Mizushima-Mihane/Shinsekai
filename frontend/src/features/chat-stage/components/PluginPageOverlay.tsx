@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { createPortal } from "react-dom";
 
 import { getPluginUiDetail } from "../../../entities/plugin/repository";
@@ -24,10 +31,48 @@ type OverlayPage = { src: string; title: string };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(min, value), Math.max(min, max));
 
-function viewportSize(): Size {
+// A cooperating page can shrink the frame to a "mini" silhouette at runtime by
+// posting { __pluginOverlay: "drag", type: "size", mini }. Mini scales the
+// declared (or default) frame down; both axes stay clamped to the viewport.
+const MINI_SCALE = 0.72;
+
+function directPage(target: PluginPageTarget): OverlayPage | null {
+  if (!target.frontendUrl) {
+    return null;
+  }
   return {
-    height: Math.max(1, Math.min(DEFAULT_HEIGHT, window.innerHeight - VIEWPORT_MARGIN * 2)),
-    width: Math.max(1, Math.min(DEFAULT_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2)),
+    src: resolvePlatformHttpUrl(target.frontendUrl),
+    title: target.pageTitle || target.pageId,
+  };
+}
+
+function miniStorageKey(target: PluginPageTarget): string {
+  return `shinsekai.plugin-overlay.mini:${target.pluginId}:${target.pageId}`;
+}
+
+function initialMini(target: PluginPageTarget): boolean {
+  try {
+    const saved = window.localStorage.getItem(miniStorageKey(target));
+    if (saved === "1") {
+      return true;
+    }
+    if (saved === "0") {
+      return false;
+    }
+  } catch {
+    // Storage can be unavailable in restricted desktop contexts; use the plugin default.
+  }
+  return target.overlayInitialMini === true;
+}
+
+function frameSize(target: PluginPageTarget, mini: boolean): Size {
+  const baseHeight = target.overlayHeight ?? DEFAULT_HEIGHT;
+  const baseWidth = target.overlayWidth ?? DEFAULT_WIDTH;
+  const desiredHeight = mini ? Math.round(baseHeight * MINI_SCALE) : baseHeight;
+  const desiredWidth = mini ? Math.round(baseWidth * MINI_SCALE) : baseWidth;
+  return {
+    height: Math.max(1, Math.min(desiredHeight, window.innerHeight - VIEWPORT_MARGIN * 2)),
+    width: Math.max(1, Math.min(desiredWidth, window.innerWidth - VIEWPORT_MARGIN * 2)),
   };
 }
 
@@ -58,9 +103,11 @@ function initialPosition(size: Size): Pos {
  */
 export function PluginPageOverlay({ onClose, target }: { onClose: () => void; target: PluginPageTarget }) {
   const { t } = useI18n();
-  const [size, setSize] = useState<Size>(viewportSize);
-  const [pos, setPos] = useState<Pos>(() => initialPosition(viewportSize()));
-  const [page, setPage] = useState<OverlayPage | null>(null);
+  const [mini, setMini] = useState(() => initialMini(target));
+  const [themeBg, setThemeBg] = useState<string | undefined>(target.overlayBackground);
+  const [size, setSize] = useState<Size>(() => frameSize(target, initialMini(target)));
+  const [pos, setPos] = useState<Pos>(() => initialPosition(frameSize(target, initialMini(target))));
+  const [page, setPage] = useState<OverlayPage | null>(() => directPage(target));
   const [pageError, setPageError] = useState(false);
   const posRef = useRef(pos);
   posRef.current = pos;
@@ -75,6 +122,13 @@ export function PluginPageOverlay({ onClose, target }: { onClose: () => void; ta
     frameLoadedRef.current = false;
     setPage(null);
     setPageError(false);
+    const immediatePage = directPage(target);
+    if (immediatePage) {
+      setPage(immediatePage);
+      return () => {
+        active = false;
+      };
+    }
     void getPluginUiDetail(target.pluginId)
       .then((detail) => {
         if (!active) {
@@ -100,7 +154,7 @@ export function PluginPageOverlay({ onClose, target }: { onClose: () => void; ta
     return () => {
       active = false;
     };
-  }, [target.pageId, target.pluginId]);
+  }, [target.frontendUrl, target.pageId, target.pageTitle, target.pluginId]);
 
   const postPresentation = useCallback(() => {
     const frameWindow = frameRef.current?.contentWindow;
@@ -130,14 +184,15 @@ export function PluginPageOverlay({ onClose, target }: { onClose: () => void; ta
   }, [postPresentation]);
 
   useEffect(() => {
-    const handleResize = () => {
-      const nextSize = viewportSize();
+    const applySize = () => {
+      const nextSize = frameSize(target, mini);
       setSize(nextSize);
       setPos((current) => clampPosition(current, nextSize));
     };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    applySize();
+    window.addEventListener("resize", applySize);
+    return () => window.removeEventListener("resize", applySize);
+  }, [mini, target]);
 
   const onBarPointerDown = (event: ReactPointerEvent) => {
     if (event.button !== 0) {
@@ -194,7 +249,14 @@ export function PluginPageOverlay({ onClose, target }: { onClose: () => void; ta
       if (!frame || event.source !== frame.contentWindow) {
         return;
       }
-      const d = event.data as { __pluginOverlay?: string; dx?: number; dy?: number; type?: string } | null;
+      const d = event.data as {
+        __pluginOverlay?: string;
+        bg?: string;
+        dx?: number;
+        dy?: number;
+        mini?: boolean;
+        type?: string;
+      } | null;
       if (!d || d.__pluginOverlay !== "drag") {
         return;
       }
@@ -216,11 +278,23 @@ export function PluginPageOverlay({ onClose, target }: { onClose: () => void; ta
         dragBase.current = null;
       } else if (d.type === "close") {
         onClose();
+      } else if (d.type === "size") {
+        const nextMini = d.mini === true;
+        setMini(nextMini);
+        try {
+          window.localStorage.setItem(miniStorageKey(target), nextMini ? "1" : "0");
+        } catch {
+          // The live resize still works when persistent storage is unavailable.
+        }
+      } else if (d.type === "theme") {
+        if (typeof d.bg === "string" && d.bg) {
+          setThemeBg(d.bg);
+        }
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [onClose, size]);
+  }, [onClose, size, target]);
 
   return createPortal(
     <section
@@ -229,7 +303,7 @@ export function PluginPageOverlay({ onClose, target }: { onClose: () => void; ta
       data-chat-stage-hitbox="true"
       data-plugin-page-overlay="true"
       role="dialog"
-      style={{ height: size.height, left: pos.x, top: pos.y, width: size.width }}
+      style={{ background: themeBg, height: size.height, left: pos.x, top: pos.y, width: size.width }}
     >
       {page ? (
         <iframe
@@ -256,6 +330,7 @@ export function PluginPageOverlay({ onClose, target }: { onClose: () => void; ta
         onPointerDown={onBarPointerDown}
         onPointerMove={onBarPointerMove}
         onPointerUp={finishBarPointerDrag}
+        style={themeBg ? ({ "--overlay-grip": "rgba(0, 0, 0, 0.3)", background: themeBg } as CSSProperties) : undefined}
         type="button"
       >
         <span aria-hidden className="plugin-overlay__grip" />

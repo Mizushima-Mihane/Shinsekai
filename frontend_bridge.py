@@ -66,6 +66,12 @@ def _set_bridge_state(state) -> None:
         _bridge_state = state
 
 
+def get_bridge_state():
+    """Return the live bridge state for in-process plugin runtime actions."""
+    with _bridge_state_lock:
+        return _bridge_state
+
+
 def _forward_plugin_user_input(state, event: dict) -> None:
     """Forward one validated frontend-action input event to the Chat process."""
     session_id = str(

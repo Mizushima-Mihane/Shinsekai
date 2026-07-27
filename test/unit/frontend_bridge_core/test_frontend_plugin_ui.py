@@ -132,6 +132,11 @@ def test_frontend_chat_ui_contributions_are_serialized_without_callbacks(monkeyp
 def test_frontend_chat_ui_contribution_serializes_phone_page_navigation(monkeypatch):
     monkeypatch.setattr(
         plugin_ui,
+        "_frontend_page_contributions_for",
+        lambda plugin_id: [SimpleNamespace(page_id="phone", title="Phone page")],
+    )
+    monkeypatch.setattr(
+        plugin_ui,
         "_frontend_chat_ui_contributions",
         lambda: [
             SimpleNamespace(
@@ -156,11 +161,13 @@ def test_frontend_chat_ui_contribution_serializes_phone_page_navigation(monkeypa
             "actionType": "open-plugin-page",
             "actionable": True,
             "description": "Open phone",
+            "frontendUrl": "/api/plugins/demo.plugin/frontend/phone/?pluginId=demo.plugin&pageId=phone",
             "icon": "smartphone",
             "id": "demo.phone",
             "order": 30.0,
             "pageId": "phone",
             "pageMode": "overlay",
+            "pageTitle": "Phone page",
             "pluginId": "demo.plugin",
             "pluginVersion": "1.0",
             "presentation": "icon-only",
@@ -169,6 +176,75 @@ def test_frontend_chat_ui_contribution_serializes_phone_page_navigation(monkeypa
             "variant": "ghost",
         }
     ]
+
+
+def test_frontend_chat_ui_contribution_serializes_overlay_presentation(monkeypatch):
+    """An overlay page may declare its window size/background; values are clamped
+    to safe bounds and the background is trimmed."""
+    monkeypatch.setattr(
+        plugin_ui,
+        "_frontend_chat_ui_contributions",
+        lambda: [
+            SimpleNamespace(
+                action={"type": "open-plugin-page", "page_id": "phone", "mode": "overlay"},
+                contribution_id="demo.phone",
+                description="Open phone",
+                icon="smartphone",
+                order=30,
+                overlay_background="  #2b1a24  ",
+                overlay_height=9999,
+                overlay_initial_mini=True,
+                overlay_width=100,
+                plugin_id="demo.plugin",
+                plugin_version="1.0",
+                presentation="button",
+                slot="chat-top-toolbar",
+                title="Phone",
+                variant="ghost",
+            )
+        ],
+    )
+
+    payload = _frontend_chat_ui_contribution_payloads()[0]
+
+    assert payload["pageMode"] == "overlay"
+    assert payload["overlayWidth"] == 240  # clamped up from 100 (min 240)
+    assert payload["overlayHeight"] == 960  # clamped down from 9999 (max 960)
+    assert payload["overlayBackground"] == "#2b1a24"  # trimmed
+    assert payload["overlayInitialMini"] is True
+
+
+def test_frontend_chat_ui_contribution_ignores_overlay_presentation_when_navigating(monkeypatch):
+    """Declared overlay sizing is dropped for non-overlay (navigate) actions."""
+    monkeypatch.setattr(
+        plugin_ui,
+        "_frontend_chat_ui_contributions",
+        lambda: [
+            SimpleNamespace(
+                action={"type": "open-plugin-page", "page_id": "phone", "mode": "navigate"},
+                contribution_id="demo.phone",
+                description="Open phone",
+                icon="smartphone",
+                order=30,
+                overlay_background="#2b1a24",
+                overlay_height=720,
+                overlay_width=420,
+                plugin_id="demo.plugin",
+                plugin_version="1.0",
+                presentation="button",
+                slot="chat-top-toolbar",
+                title="Phone",
+                variant="ghost",
+            )
+        ],
+    )
+
+    payload = _frontend_chat_ui_contribution_payloads()[0]
+
+    assert payload["pageMode"] == "navigate"
+    assert "overlayWidth" not in payload
+    assert "overlayHeight" not in payload
+    assert "overlayBackground" not in payload
 
 
 def test_frontend_chat_ui_payload_does_not_truncate_lookup_identifiers(monkeypatch):

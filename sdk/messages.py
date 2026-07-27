@@ -19,6 +19,10 @@ class UserInputMessage(BaseModel):
         default_factory=list,
         description="User-selected chat attachments validated by core.media before processing.",
     )
+    hidden: bool = Field(
+        False,
+        description="Keep this runtime control input out of the visible chat transcript.",
+    )
 
 
 class LLMDialogMessage(BaseModel):

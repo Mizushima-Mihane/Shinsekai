@@ -185,6 +185,13 @@ class FrontendChatUIContribution:
     variant: Literal["danger", "ghost", "primary"] = "ghost"
     plugin_id: str | None = None
     plugin_version: str | None = None
+    # Optional floating-overlay presentation, honored only when the action mode
+    # is "overlay": let the page declare the window's size and background so the
+    # host need not hardcode one shape for every plugin. Unset -> host default.
+    overlay_width: int | None = None
+    overlay_height: int | None = None
+    overlay_background: str | None = None
+    overlay_initial_mini: bool = False
 
 
 @dataclass(frozen=True)
