@@ -142,6 +142,29 @@ def test_llm_worker_run_uses_original_queues_and_marks_input_done(
     )
 
 
+def test_llm_worker_keeps_hidden_runtime_input_out_of_visible_history(monkeypatch) -> None:
+    user_input_queue = CountingQueue()
+    tts_queue = CountingQueue()
+    user_input_queue.put(UserInputMessage(text="[call accepted]", hidden=True))
+    user_input_queue.put(None)
+
+    runtime = _make_app_runtime()
+    runtime.config.config.api_config.is_streaming = False
+    runtime.llm_manager.chat.return_value = (
+        '{"character_name":"Alice","speech":"Hi","sprite":"0"}'
+    )
+
+    worker = LLMWorker(user_input_queue, tts_queue)
+    monkeypatch.setattr(worker, "_init_app", lambda: None)
+    worker.ui_update_manager = runtime.ui_update_manager
+    worker.llm_manager = runtime.llm_manager
+    worker.run()
+
+    runtime.ui_update_manager.record_user_message.assert_not_called()
+    runtime.ui_update_manager.post_notification.assert_not_called()
+    runtime.llm_manager.chat.assert_called_once()
+
+
 def test_llm_worker_passes_locally_read_attachments_without_file_tool_group(tmp_path) -> None:
     image = tmp_path / "scene.png"
     image.write_bytes(b"image")

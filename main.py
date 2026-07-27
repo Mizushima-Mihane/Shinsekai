@@ -738,6 +738,7 @@ def main():
             attachments: list[dict[str, object]] | None = None,
             ignore_unavailable_attachments: bool = False,
             notify_key: str | None = "main.notify_submitted",
+            hidden: bool = False,
         ) -> bool:
             value = str(text or "").strip()
             try:
@@ -753,13 +754,15 @@ def main():
                         continue
             if not value and not resolved_attachments:
                 return False
-            last_user_message["text"] = value
-            last_user_message["attachments"] = [attachment.to_payload() for attachment in resolved_attachments]
+            attachment_payloads = [attachment.to_payload() for attachment in resolved_attachments]
+            if not hidden:
+                last_user_message["text"] = value
+                last_user_message["attachments"] = attachment_payloads
             if emit_user_text is None:
                 if notify_key:
                     ui_updates.post_notification(tr_i18n("main.notify_chat"))
                 return False
-            accepted = emit_user_text(value, attachments=last_user_message["attachments"])
+            accepted = emit_user_text(value, attachments=attachment_payloads, hidden=hidden)
             if accepted is False:
                 return False
             if notify_key:
@@ -1020,6 +1023,7 @@ def main():
                             str(payload.get("text") or ""),
                             attachments=raw_attachments if isinstance(raw_attachments, list) else [],
                             notify_key=None,
+                            hidden=bool(payload.get("hidden", False)),
                         )
                     else:
                         submit_runtime_text(str(payload or ""), notify_key=None)

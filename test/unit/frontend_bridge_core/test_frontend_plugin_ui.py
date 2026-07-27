@@ -103,13 +103,17 @@ def test_frontend_chat_ui_contributions_are_serialized_without_callbacks(monkeyp
     assert payload == [
         {
             "actionLabel": "Run",
+            "actionType": "callback",
             "actionable": True,
             "description": "Host rendered",
             "icon": "sparkles",
             "id": "demo.action",
             "order": 12.0,
+            "pageId": "",
+            "pageMode": "navigate",
             "pluginId": "demo.plugin",
             "pluginVersion": "1.0",
+            "presentation": "button",
             "slot": "chat-dialog-actions",
             "title": "Demo action",
             "variant": "primary",
@@ -123,6 +127,55 @@ def test_frontend_chat_ui_contributions_are_serialized_without_callbacks(monkeyp
         "message": "done",
         "pluginId": "demo.plugin",
     }
+
+
+def test_frontend_chat_ui_serializes_overlay_page_metadata(monkeypatch):
+    monkeypatch.setattr(
+        plugin_ui,
+        "_frontend_chat_ui_contributions",
+        lambda: [
+            SimpleNamespace(
+                action={"type": "open-plugin-page", "page_id": "phone", "mode": "overlay"},
+                contribution_id="open_phone",
+                icon="smartphone",
+                overlay_background="#ebe6ee",
+                overlay_height=860,
+                overlay_initial_mini=True,
+                overlay_width=400,
+                plugin_id="com.example.phone",
+                plugin_version="2.0.0",
+                slot="chat-top-toolbar",
+                title="Phone",
+            )
+        ],
+    )
+    monkeypatch.setattr(plugin_ui, "_frontend_page_contribution", lambda *_args: SimpleNamespace(title="Doki Chat"))
+
+    assert _frontend_chat_ui_contribution_payloads() == [
+        {
+            "actionLabel": "Phone",
+            "actionType": "open-plugin-page",
+            "actionable": True,
+            "description": "",
+            "frontendUrl": "/api/plugins/com.example.phone/frontend/phone/?pluginId=com.example.phone&pageId=phone",
+            "icon": "smartphone",
+            "id": "open_phone",
+            "order": 100.0,
+            "overlayBackground": "#ebe6ee",
+            "overlayHeight": 860,
+            "overlayInitialMini": True,
+            "overlayWidth": 400,
+            "pageId": "phone",
+            "pageMode": "overlay",
+            "pageTitle": "Doki Chat",
+            "pluginId": "com.example.phone",
+            "pluginVersion": "2.0.0",
+            "presentation": "icon-only",
+            "slot": "chat-top-toolbar",
+            "title": "Phone",
+            "variant": "ghost",
+        }
+    ]
 
 
 def test_frontend_config_page_payload_normalizes_kind_and_values():

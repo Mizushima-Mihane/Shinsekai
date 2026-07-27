@@ -6,12 +6,14 @@ import { isTauriDesktop } from "../../shared/desktop/desktopApi";
 import { closeChatSurface } from "../../shared/desktop/chatWindow";
 import { sendChatCommand, uploadChatAttachments } from "../../entities/chat/repository";
 import { useI18n } from "../../shared/i18n";
+import type { PluginPageTarget } from "../../shared/plugin/PluginSlot";
 import type { ChatAttachmentInput, ChatSendPayload, ChatTurnOptions } from "../../shared/platform/types";
 import { normalizeThemeColor } from "../../shared/theme/appTheme";
 import { DEFAULT_TYPEWRITER_CPS } from "../../shared/theme/chatTheme";
 import { AlertDialog, PathPickerDialog, useToast } from "../../shared/ui";
 import { closeChatRuntime } from "../chat-startup/runtimeState";
 import { ChatConfigDialog } from "./components/ChatConfigDialog";
+import { PluginPageOverlay } from "./components/PluginPageOverlay";
 import { ConversationTreeDialog } from "./components/ConversationTreeDialog";
 import { DialogStageControls } from "./components/DialogStageControls";
 import { HistoryDialog } from "./components/HistoryDialog";
@@ -63,6 +65,7 @@ export function ChatStagePage() {
   const [state, dispatch] = useReducer(chatStageReducer, emptyChatState);
   const [confirmClearHistory, setConfirmClearHistory] = useState(false);
   const [confirmRevertUserIndex, setConfirmRevertUserIndex] = useState<number | null>(null);
+  const [overlayTarget, setOverlayTarget] = useState<PluginPageTarget | null>(null);
   const [branchDialogOpen, setBranchDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [dialogControlsLocked, setDialogControlsLocked] = useState(false);
@@ -108,6 +111,7 @@ export function ChatStagePage() {
   const statsVisible = viewModel.stats.length > 0;
   const tokenUsageVisible = tokenUsageOpen && Boolean(viewModel.tokenUsageText);
   const modalOpen =
+    overlayTarget != null ||
     themePickerOpen ||
     toolbarConfigOpen ||
     branchDialogOpen ||
@@ -174,6 +178,12 @@ export function ChatStagePage() {
     loadFallbackMessage: t("chat.error.loadFallback"),
     queueAnimatedDialog,
   });
+
+  useEffect(() => {
+    const open = (event: Event) => setOverlayTarget((event as CustomEvent<PluginPageTarget>).detail);
+    window.addEventListener("shinsekai:open-plugin-page", open);
+    return () => window.removeEventListener("shinsekai:open-plugin-page", open);
+  }, []);
 
   useEffect(() => {
     if (!viewModel.layers.dialog) {
@@ -434,6 +444,7 @@ export function ChatStagePage() {
 
   return (
     <>
+      {overlayTarget ? <PluginPageOverlay onClose={() => setOverlayTarget(null)} target={overlayTarget} /> : null}
       <main
         className="chat-stage"
         data-background={transparentBackground ? "transparent" : "media"}
@@ -450,9 +461,10 @@ export function ChatStagePage() {
         <StandaloneDesktopResizeHandles hidden={!standaloneDesktopWindow} />
         <TopStageTools
           autoHide={runtimeConfig.immersiveMode && runtimeConfig.autoHideTopTools}
-          hidden={!viewModel.layers.toolbar}
-          onCloseDesktopWindow={closeSurface}
-          onThemePickerOpenChange={setThemePickerOpen}
+      hidden={!viewModel.layers.toolbar}
+      onCloseDesktopWindow={closeSurface}
+      onOpenPluginPage={setOverlayTarget}
+      onThemePickerOpenChange={setThemePickerOpen}
           onTokenUsageOpenChange={setTokenUsageOpen}
           standaloneDesktopWindow={standaloneDesktopWindow}
           status={viewModel.statusText}

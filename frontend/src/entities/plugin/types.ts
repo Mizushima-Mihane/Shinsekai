@@ -28,6 +28,7 @@ export type {
   PluginSlotActionResult,
   PluginSlotContribution,
   PluginSlotContributionIcon,
+  PluginSlotContributionPresentation,
   PluginSlotContributionVariant,
   PluginUIDetail,
   PluginUIPage,

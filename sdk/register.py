@@ -269,7 +269,7 @@ class PluginCapabilityRegistry:
 
     def register_frontend_chat_ui(self, contribution: FrontendChatUIContribution) -> None:
         """Register a JSON-only Chat UI item rendered by the host application."""
-        if contribution.slot not in {"chat-dialog-actions", "chat-output", "chat-toolbar"}:
+        if contribution.slot not in {"chat-dialog-actions", "chat-output", "chat-toolbar", "chat-top-toolbar"}:
             raise ValueError(f"Unsupported frontend chat UI slot: {contribution.slot}")
         if not contribution.contribution_id.strip() or not contribution.title.strip():
             raise ValueError("FrontendChatUIContribution requires a non-empty id and title")

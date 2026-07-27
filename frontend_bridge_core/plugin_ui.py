@@ -335,9 +335,37 @@ def _frontend_chat_ui_contributions() -> list[Any]:
     )
 
 
+def _overlay_presentation(contribution: Any) -> dict[str, Any]:
+    """Return bounded optional presentation fields for plugin page overlays."""
+    out: dict[str, Any] = {}
+    for source, target, minimum, maximum in (
+        ("overlay_width", "overlayWidth", 240, 640),
+        ("overlay_height", "overlayHeight", 320, 960),
+    ):
+        try:
+            value = int(getattr(contribution, source, None))
+        except (TypeError, ValueError):
+            continue
+        out[target] = max(minimum, min(value, maximum))
+    background = getattr(contribution, "overlay_background", None)
+    if isinstance(background, str) and background.strip():
+        out["overlayBackground"] = background.strip()[:120]
+    if bool(getattr(contribution, "overlay_initial_mini", False)):
+        out["overlayInitialMini"] = True
+    return out
+
+
+def _frontend_page_url(plugin_id: str, page_id: str) -> str:
+    return (
+        f"/api/plugins/{quote(plugin_id, safe='')}/frontend/{quote(page_id, safe='')}/"
+        f"?pluginId={quote(plugin_id, safe='')}&pageId={quote(page_id, safe='')}"
+    )
+
+
 def _frontend_chat_ui_contribution_payloads() -> list[dict[str, Any]]:
-    allowed_slots = {"chat-dialog-actions", "chat-output", "chat-toolbar"}
-    allowed_icons = {"info", "play", "puzzle", "settings", "sparkles"}
+    allowed_slots = {"chat-dialog-actions", "chat-output", "chat-toolbar", "chat-top-toolbar"}
+    allowed_icons = {"info", "play", "puzzle", "settings", "smartphone", "sparkles"}
+    allowed_presentations = {"button", "icon-only"}
     allowed_variants = {"danger", "ghost", "primary"}
     rows: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
@@ -350,23 +378,45 @@ def _frontend_chat_ui_contribution_payloads() -> list[dict[str, Any]]:
         if not plugin_id or not contribution_id or not title or slot not in allowed_slots or key in seen:
             continue
         seen.add(key)
+        action = getattr(contribution, "action", None)
+        action_type, page_id, page_mode = "none", "", "navigate"
+        if callable(action):
+            action_type = "callback"
+        elif isinstance(action, Mapping):
+            page_id = str(action.get("page_id") or action.get("pageId") or "").strip()[:128]
+            if str(action.get("type") or "").strip() == "open-plugin-page" and page_id:
+                action_type = "open-plugin-page"
+                page_mode = "overlay" if str(action.get("mode") or "").strip().lower() == "overlay" else "navigate"
         icon = str(getattr(contribution, "icon", "") or "puzzle").strip()
+        presentation = str(getattr(contribution, "presentation", "") or "button").strip()
+        if slot == "chat-top-toolbar":
+            presentation = "icon-only"
         variant = str(getattr(contribution, "variant", "") or "ghost").strip()
-        rows.append(
-            {
-                "actionLabel": str(getattr(contribution, "action_label", "") or "").strip() or title,
-                "actionable": callable(getattr(contribution, "action", None)),
-                "description": str(getattr(contribution, "description", "") or "").strip()[:500],
-                "icon": icon if icon in allowed_icons else "puzzle",
-                "id": contribution_id[:128],
-                "order": float(getattr(contribution, "order", 100.0) or 100.0),
-                "pluginId": plugin_id[:128],
-                "pluginVersion": str(getattr(contribution, "plugin_version", "") or "")[:64],
-                "slot": slot,
-                "title": title[:160],
-                "variant": variant if variant in allowed_variants else "ghost",
-            }
-        )
+        row = {
+            "actionLabel": str(getattr(contribution, "action_label", "") or "").strip() or title,
+            "actionType": action_type,
+            "actionable": action_type != "none",
+            "description": str(getattr(contribution, "description", "") or "").strip()[:500],
+            "icon": icon if icon in allowed_icons else "puzzle",
+            "id": contribution_id[:128],
+            "order": float(getattr(contribution, "order", 100.0) or 100.0),
+            "pageId": page_id,
+            "pageMode": page_mode,
+            "pluginId": plugin_id[:128],
+            "pluginVersion": str(getattr(contribution, "plugin_version", "") or "")[:64],
+            "presentation": presentation if presentation in allowed_presentations else "button",
+            "slot": slot,
+            "title": title[:160],
+            "variant": variant if variant in allowed_variants else "ghost",
+        }
+        if page_mode == "overlay":
+            row.update(_overlay_presentation(contribution))
+        if action_type == "open-plugin-page":
+            page = _frontend_page_contribution(plugin_id, page_id)
+            if page is not None:
+                row["frontendUrl"] = _frontend_page_url(plugin_id, page_id)
+                row["pageTitle"] = str(getattr(page, "title", "") or "").strip()[:160] or page_id
+        rows.append(row)
     return rows
 
 

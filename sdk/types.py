@@ -174,16 +174,20 @@ class FrontendChatUIContribution:
     """
 
     contribution_id: str
-    slot: Literal["chat-dialog-actions", "chat-output", "chat-toolbar"]
+    slot: Literal["chat-dialog-actions", "chat-output", "chat-toolbar", "chat-top-toolbar"]
     title: str
-    action: Callable[[], Mapping[str, Any] | str | None] | None = None
+    action: Callable[[], Mapping[str, Any] | str | None] | Mapping[str, Any] | None = None
     action_label: str = ""
     description: str = ""
-    icon: Literal["info", "play", "puzzle", "settings", "sparkles"] = "puzzle"
+    icon: Literal["info", "play", "puzzle", "settings", "smartphone", "sparkles"] = "puzzle"
     order: float = 100.0
     variant: Literal["danger", "ghost", "primary"] = "ghost"
     plugin_id: str | None = None
     plugin_version: str | None = None
+    overlay_width: int | None = None
+    overlay_height: int | None = None
+    overlay_background: str | None = None
+    overlay_initial_mini: bool = False
 
 
 @dataclass(frozen=True)
